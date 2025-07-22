@@ -1,0 +1,44 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Optional: Redirect specific pages
+# [[redirects]]
+#   from = "/old-page"
+#   to = "/new-page"
+#   status = 301
+
+# Optional: Force HTTPS
+# [[redirects]]
+#   from = "http://barmitzvatop.com/*"
+#   to = "https://barmitzvatop.com/:splat"
+#   status = 301
+#   force = true
+
+# Optional: Redirect www to non-www
+# [[redirects]]
+#   from = "https://www.barmitzvatop.com/*"
+#   to = "https://barmitzvatop.com/:splat"
+#   status = 301
+#   force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable" 
