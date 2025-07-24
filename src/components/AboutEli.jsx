@@ -1,7 +1,7 @@
 import { Box, Heading, Text, HStack, VStack, IconButton, Image } from '@chakra-ui/react';
 import { FaInstagram, FaFacebook, FaYoutube, FaTiktok } from 'react-icons/fa';
 
-const aboutText = `Soy Eli Levy, profesor de Bar Mitzvá con más de 16 años de experiencia. Comencé a enseñar a los 17 años, inspirado por mi padre, quien me preparó con dedicación para mi propio Bar Mitzvá. Nací en Venezuela y actualmente vivo en Panamá, donde he acompañado a más de 100 alumnos, presencial y online, en su camino hacia este día tan especial. Mis clases combinan tradición, técnica y cercanía, para que cada joven se prepare con seguridad, buena pronunciación y entonación perfecta.`;
+const aboutText = `Soy Eli Levy, profesor de Barmitzva con más de 16 años de experiencia. Comencé a enseñar a los 17 años, inspirado por mi padre, quien me preparó con dedicación para mi propio Barmitzva. Nací en Venezuela y actualmente vivo en Panamá, donde he acompañado a más de 100 alumnos, presencial y online, en su camino hacia este día tan especial. Mis clases combinan tradición, técnica y cercanía, para que cada joven se prepare con seguridad, buena pronunciación y entonación perfecta.`;
 
 const AboutEli = () => (
   <Box id="about-eli" bg="white" py={20}>

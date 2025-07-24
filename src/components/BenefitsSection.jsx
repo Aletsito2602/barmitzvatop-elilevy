@@ -68,7 +68,7 @@ const BenefitsSection = () => (
           fontWeight="bold"
           color="#F59E0B"
         >
-          ¿Qué Obtendrás Con Nosotros?
+          ¿Qué obtendrás conmigo?
         </Heading>
       </motion.div>
       <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={10}>
@@ -167,6 +167,11 @@ const BenefitsSection = () => (
                 boxShadow: '0 10px 25px rgba(245, 158, 11, 0.4)'
               }}
               transition="all 0.2s ease"
+              onClick={() => {
+                document.getElementById('pricing')?.scrollIntoView({ 
+                  behavior: 'smooth' 
+                });
+              }}
             >
               Reserva tu lugar ahora
             </Box>

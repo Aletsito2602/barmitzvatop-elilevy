@@ -71,7 +71,7 @@ export const createUserProfile = async (uid, userData) => {
       lastActivityDate: serverTimestamp(),
       firstLoginDate: serverTimestamp(),
       profileCompletionDate: null,
-      barMitzvahPrepStartDate: serverTimestamp(),
+      barmitzvaStartDate: serverTimestamp(),
       
       // Performance Metrics
       averageClassScore: 0,        // Promedio de calificaciones
@@ -318,12 +318,12 @@ export const calculatePersonalParasha = (birthDate) => {
     const thisYearBirthday = new Date(currentYear, birth.getMonth(), birth.getDate());
     
     // If birthday hasn't passed this year, use this year, otherwise next year
-    const barMitzvahDate = thisYearBirthday < new Date() ? 
+    const barmitzvaDate = thisYearBirthday < new Date() ? 
       new Date(currentYear + 1, birth.getMonth(), birth.getDate()) :
       thisYearBirthday;
     
-    // Add 13 years to birth date for Bar Mitzvah
-    barMitzvahDate.setFullYear(barMitzvahDate.getFullYear() + (13 - (currentYear - birth.getFullYear())));
+    // Add 13 years to birth date for Barmitzva
+    barmitzvaDate.setFullYear(barmitzvaDate.getFullYear() + (13 - (currentYear - birth.getFullYear())));
     
     // Simple parasha rotation (in reality this would be more complex)
     const parashas = [
@@ -339,19 +339,19 @@ export const calculatePersonalParasha = (birthDate) => {
       { name: 'Parashat Miketz', hebrew: 'מִקֵּץ', reference: 'Génesis 41:1-44:17' }
     ];
     
-    const weekOfYear = Math.floor((barMitzvahDate - new Date(barMitzvahDate.getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000));
+    const weekOfYear = Math.floor((barmitzvaDate - new Date(barmitzvaDate.getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000));
     const parashaIndex = weekOfYear % parashas.length;
     
     return {
       parasha: parashas[parashaIndex],
-      barMitzvahDate: barMitzvahDate,
+      barmitzvaDate: barmitzvaDate,
       calculated: true
     };
   } catch (error) {
     console.error('Error calculating parasha:', error);
     return {
       parasha: { name: 'Parashat Vayeshev', hebrew: 'וַיֵּשֶׁב', reference: 'Génesis 37:1-40:23' },
-      barMitzvahDate: null,
+      barmitzvaDate: null,
       calculated: false
     };
   }

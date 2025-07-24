@@ -75,9 +75,9 @@ const PerfilPage = () => {
     name: '',
     email: '',
     birthDate: '',
-    barMitzvahDate: '',
+    barmitzvaDate: '',
     birthPlace: '',
-    barMitzvahLocation: '',
+    barmitzvaLocation: '',
     phone: '',
     bio: '',
     studyPlan: 'alef',
@@ -91,9 +91,9 @@ const PerfilPage = () => {
         name: userProfile.name || '',
         email: userProfile.email || '',
         birthDate: userProfile.birthDate || '',
-        barMitzvahDate: userProfile.barMitzvahDate || '',
+        barmitzvaDate: userProfile.barmitzvaDate || '',
         birthPlace: userProfile.birthPlace || '',
-        barMitzvahLocation: userProfile.barMitzvahLocation || '',
+        barmitzvaLocation: userProfile.barmitzvaLocation || '',
         phone: userProfile.phone || '',
         bio: userProfile.bio || '',
         studyPlan: userProfile.studyPlan || 'alef',
@@ -204,10 +204,10 @@ const PerfilPage = () => {
     return `${age} años`;
   };
 
-  const getDaysUntilBarMitzvah = (barMitzvahDate) => {
-    if (!barMitzvahDate) return null;
+  const getDaysUntilBarmitzva = (barmitzvaDate) => {
+    if (!barmitzvaDate) return null;
     const today = new Date();
-    const bmDate = new Date(barMitzvahDate);
+    const bmDate = new Date(barmitzvaDate);
     const diffTime = bmDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
@@ -264,7 +264,7 @@ const PerfilPage = () => {
     );
   }
 
-  const daysUntilBM = getDaysUntilBarMitzvah(userProfile?.barMitzvahDate);
+  const daysUntilBM = getDaysUntilBarmitzva(userProfile?.barmitzvaDate);
 
   return (
     <Box w="100%" maxW="95vw" mx="auto" py={8} px={{ base: 4, md: 6, lg: 8 }}>
@@ -306,7 +306,7 @@ const PerfilPage = () => {
           </Button>
         </Flex>
 
-        {/* Countdown to Bar Mitzvah */}
+        {/* Countdown to Barmitzva */}
         {daysUntilBM && daysUntilBM !== 'Barmitzva realizado' && (
           <Card bg="gradient-to-r from-orange-50 to-yellow-50" borderColor="#F59E0B" borderWidth={2}>
             <CardBody>
@@ -396,7 +396,7 @@ const PerfilPage = () => {
             </CardBody>
           </Card>
 
-          {/* Bar Mitzvah Info */}
+          {/* Barmitzva Info */}
           <Card>
             <CardHeader>
               <HStack>
@@ -408,8 +408,8 @@ const PerfilPage = () => {
               <VStack spacing={3} align="stretch">
                 <Box>
                   <Text fontWeight="bold" fontSize="sm" color="gray.600">Fecha del Barmitzva</Text>
-                  <Text fontSize="md" color={userProfile?.barMitzvahDate ? "gray.800" : "gray.400"}>
-                    {userProfile?.barMitzvahDate ? new Date(userProfile.barMitzvahDate).toLocaleDateString('es-ES', {
+                  <Text fontSize="md" color={userProfile?.barmitzvaDate ? "gray.800" : "gray.400"}>
+                    {userProfile?.barmitzvaDate ? new Date(userProfile.barmitzvaDate).toLocaleDateString('es-ES', {
                       weekday: 'long',
                       year: 'numeric',
                       month: 'long',
@@ -419,8 +419,8 @@ const PerfilPage = () => {
                 </Box>
                 <Box>
                   <Text fontWeight="bold" fontSize="sm" color="gray.600">Sinagoga / Ubicación</Text>
-                  <Text fontSize="md" color={userProfile?.barMitzvahLocation ? "gray.800" : "gray.400"}>
-                    {userProfile?.barMitzvahLocation || 'Agregar ubicación del evento'}
+                  <Text fontSize="md" color={userProfile?.barmitzvaLocation ? "gray.800" : "gray.400"}>
+                    {userProfile?.barmitzvaLocation || 'Agregar ubicación del evento'}
                   </Text>
                 </Box>
                 <Box>
@@ -552,16 +552,16 @@ const PerfilPage = () => {
 
               <Divider />
 
-              {/* Bar Mitzvah Information */}
+              {/* Barmitzva Information */}
               <Box w="100%">
                 <Heading size="sm" mb={4} color="gray.700">Información del Barmitzva</Heading>
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                   <FormControl>
                     <FormLabel>Fecha del Barmitzva</FormLabel>
                     <Input
-                      name="barMitzvahDate"
+                      name="barmitzvaDate"
                       type="date"
-                      value={formData.barMitzvahDate}
+                      value={formData.barmitzvaDate}
                       onChange={handleInputChange}
                     />
                   </FormControl>
@@ -569,8 +569,8 @@ const PerfilPage = () => {
                   <FormControl>
                     <FormLabel>Ubicación del Barmitzva</FormLabel>
                     <Input
-                      name="barMitzvahLocation"
-                      value={formData.barMitzvahLocation}
+                      name="barmitzvaLocation"
+                      value={formData.barmitzvaLocation}
                       onChange={handleInputChange}
                       placeholder="Sinagoga, Ciudad"
                     />

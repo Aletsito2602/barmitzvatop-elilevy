@@ -75,15 +75,6 @@ const Navbar = () => {
             <NavLink to="#benefits" isAnchor>Beneficios</NavLink>
             <NavLink to="#about-eli" isAnchor>Sobre Eli</NavLink>
             <NavLink to="#pricing" isAnchor>Precios</NavLink>
-            <Link 
-              href="https://barmitzvaconelilevy.com" 
-              isExternal 
-              _hover={{ textDecoration: 'none', color: '#F59E0B' }}
-              color="white"
-              fontSize="md"
-            >
-              Clases Privadas
-            </Link>
             <NavLink to="#faq" isAnchor>FAQ</NavLink>
             <Button
               as={RouterLink}
@@ -129,17 +120,6 @@ const Navbar = () => {
               <NavLink to="#benefits" isAnchor onClick={onClose}>Beneficios</NavLink>
               <NavLink to="#about-eli" isAnchor onClick={onClose}>Sobre Eli</NavLink>
               <NavLink to="#pricing" isAnchor onClick={onClose}>Precios</NavLink>
-              <Link 
-                href="https://barmitzvaconelilevy.com" 
-                isExternal 
-                _hover={{ textDecoration: 'none', color: '#F59E0B' }}
-                color="white"
-                fontSize="lg"
-                py={2}
-                onClick={onClose}
-              >
-                Clases Privadas
-              </Link>
               <NavLink to="#faq" isAnchor onClick={onClose}>FAQ</NavLink>
               <Button
                 as={RouterLink}

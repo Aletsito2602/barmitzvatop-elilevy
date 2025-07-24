@@ -1,4 +1,4 @@
-# BMTOP 
+# Firebase Data Architecture Guide for Claude Code 
 
 Este es un proyecto para la plataforma online de Eli Levy. La aplicación está construida con React, Vite y Firebase, y utiliza Chakra UI para los componentes de la interfaz de usuario.
 

@@ -214,7 +214,7 @@ export const initializeCommunityData = async () => {
       {
         userId: 'user3',
         title: 'Nervios antes de la ceremonia',
-        content: 'Mi Bar Mitzvá es en dos meses y empiezo a sentir nervios. ¿Es normal? ¿Cómo manejaron ustedes la ansiedad antes del gran día?',
+        content: 'Mi Barmitzva es en dos meses y empiezo a sentir nervios. ¿Es normal? ¿Cómo manejaron ustedes la ansiedad antes del gran día?',
         category: 'ceremonia',
         likes: 31,
         repliesCount: 18

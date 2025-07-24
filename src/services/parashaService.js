@@ -203,9 +203,9 @@ export const calculateParashaFromDate = (birthDate, birthTime, birthPlace) => {
     const birth = new Date(birthDate);
     const currentYear = new Date().getFullYear();
     
-    // Calculate Bar Mitzvah date (13 years after birth)
-    const barMitzvahDate = new Date(birth);
-    barMitzvahDate.setFullYear(birth.getFullYear() + 13);
+    // Calculate Barmitzva date (13 years after birth)
+    const barmitzvaDate = new Date(birth);
+    barmitzvaDate.setFullYear(birth.getFullYear() + 13);
     
     // Sample Parashas - in reality this would be based on Hebrew calendar calculations
     const parashas = [
@@ -253,7 +253,7 @@ export const calculateParashaFromDate = (birthDate, birthTime, birthPlace) => {
     return {
       success: true,
       parasha: selectedParasha,
-      barMitzvahDate: barMitzvahDate,
+      barmitzvaDate: barmitzvaDate,
       calculatedAt: new Date(),
       birthInfo: {
         date: birthDate,

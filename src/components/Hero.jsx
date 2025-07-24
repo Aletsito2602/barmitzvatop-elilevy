@@ -38,7 +38,7 @@ const Hero = () => {
                 letterSpacing="wider"
                 textAlign="center"
               >
-                By Eli Levy
+                Profesor internacional - Costumbre Sefardí
               </Text>
             </motion.div>
             <motion.div
@@ -56,7 +56,7 @@ const Hero = () => {
                 bgClip="text"
                 textAlign="center"
               >
-                Preparación Moderna para tu Bar Mitzvá
+                Preparación para tu Barmitzva
               </Heading>
             </motion.div>
             <motion.div
@@ -65,24 +65,7 @@ const Hero = () => {
               transition={{ duration: 0.6, delay: 0.6 }}
             >
               <Text fontSize="xl" color="gray.200" maxW="2xl" lineHeight="tall" textAlign="center">
-                Profesor con más de 16 años de experiencia. Más de 100 alumnos preparados exitosamente. 
-                Clases que combinan tradición, técnica y cercanía para una preparación 
-                con seguridad, buena pronunciación y entonación perfecta.
-              </Text>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.8 }}
-            >
-              <Text 
-                fontSize="lg" 
-                fontWeight="bold" 
-                color="#3B82F6"
-                textShadow="0 0 20px rgba(59, 130, 246, 0.5)"
-                textAlign="center"
-              >
-                DESDE VENEZUELA A PANAMÁ - TRADICIÓN SEFARADÍ
+                Profesor con más de 16 años de experiencia. Más de 100 alumnos preparados exitosamente presencial y online. Clases que combinan tradición, técnica y cercanía para una preparación con seguridad, buena pronunciación y entonación perfecta.
               </Text>
             </motion.div>
             <motion.div
@@ -108,6 +91,11 @@ const Hero = () => {
                   boxShadow: '0 15px 35px rgba(59, 130, 246, 0.4)',
                 }}
                 transition="all 0.3s ease"
+                onClick={() => {
+                  document.getElementById('pricing')?.scrollIntoView({ 
+                    behavior: 'smooth' 
+                  });
+                }}
               >
                 Comenzar Ahora
               </Button>
@@ -137,26 +125,20 @@ const Hero = () => {
                 transition="all 0.3s ease"
                 cursor="pointer"
               >
-                  <motion.div
-                    whileHover={{ 
-                      scale: 1.1,
-                      rotate: [0, -5, 5, -5, 0]
-                    }}
-                    transition={{ 
-                      scale: { duration: 0.3 },
-                      rotate: { duration: 0.5, ease: "easeInOut" }
-                    }}
-                  >
-                    <Image
-                      src="/favicon.png"
-                      alt="BMTop Academy Logo"
-                      maxH="200px"
-                      maxW="90%"
-                      objectFit="contain"
-                      mx="auto"
-                      filter="drop-shadow(0 10px 20px rgba(59, 130, 246, 0.3))"
-                    />
-                  </motion.div>
+                <Box
+                  as="iframe"
+                  src="https://www.youtube.com/embed/nJ0syOHobpk"
+                  title="Barmitzva Preparation Video"
+                  width="100%"
+                  height="100%"
+                  borderRadius="2xl"
+                  border="none"
+                  allowFullScreen
+                  position="absolute"
+                  top="0"
+                  left="0"
+                  filter="drop-shadow(0 10px 20px rgba(59, 130, 246, 0.3))"
+                />
               </Box>
             </motion.div>
           </Box>

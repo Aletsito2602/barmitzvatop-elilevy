@@ -89,7 +89,7 @@ export const getChatRoomInfo = async (roomId) => {
 
     const roomDescriptions = {
       [CHAT_ROOMS.NUEVOS]: 'Espacio para estudiantes que están comenzando su preparación',
-      [CHAT_ROOMS.GRADUADOS]: 'Comunidad de estudiantes que ya completaron su Bar Mitzvá'
+      [CHAT_ROOMS.GRADUADOS]: 'Comunidad de estudiantes que ya completaron su Barmitzva'
     };
 
     return {
@@ -109,8 +109,8 @@ export const getChatRoomInfo = async (roomId) => {
 
 // Determine which chat room a user should join based on their status
 export const getUserChatRoom = (userProfile) => {
-  // Check if user has completed Bar Mitzvah
-  if (userProfile?.barMitzvahCompleted === true) {
+  // Check if user has completed Barmitzva
+  if (userProfile?.barmitzvaCompleted === true) {
     return CHAT_ROOMS.GRADUADOS;
   }
   
@@ -137,11 +137,11 @@ export const getAvailableChatRooms = (userProfile) => {
   });
   
   // Only graduated students can access the graduates room
-  if (userProfile?.barMitzvahCompleted === true || userProfile?.progress?.lessonsCompleted >= 24) {
+  if (userProfile?.barmitzvaCompleted === true || userProfile?.progress?.lessonsCompleted >= 24) {
     rooms.push({
       id: CHAT_ROOMS.GRADUADOS,
       name: 'Estudiantes Graduados', 
-      description: 'Comunidad de graduados del Bar Mitzvá',
+      description: 'Comunidad de graduados del Barmitzva',
       icon: '🎓',
       isDefault: false
     });

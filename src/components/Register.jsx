@@ -167,7 +167,7 @@ const Register = () => {
           
           // Profile completion tracking
           profileCompleted: false,
-          barMitzvahDateSet: false,
+          barmitzvaDateSet: false,
           
           // Preferences
           preferences: {

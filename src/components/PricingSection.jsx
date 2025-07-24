@@ -232,12 +232,16 @@ const PricingSection = () => {
                 bg={plan.color} 
                 color="white" 
                 borderRadius="lg" 
-                py={3} 
-                px={4} 
+                py={4} 
+                px={8} 
                 textAlign="center" 
                 fontWeight="bold" 
                 fontSize="2xl" 
                 mb={2}
+                minH="80px"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
                 cursor="pointer"
                 onClick={() => handlePriceClick(plan)}
                 _hover={{ 
@@ -247,7 +251,13 @@ const PricingSection = () => {
                 }}
                 transition="all 0.2s"
               >
-                ${plan.price} <Text as="span" fontSize="md" fontWeight="normal">Anual</Text>
+                {idx === 0 ? (
+                  <VStack spacing={1}>
+                    <Text as="span" fontSize="lg" textDecoration="line-through" color="gray.400">$500</Text>
+                    <Text as="span" fontSize="2xl" fontWeight="bold">${plan.price}</Text>
+                    <Text as="span" fontSize="md" fontWeight="normal">Anual</Text>
+                  </VStack>
+                ) : 'Próximamente'}
                 <motion.div
                   style={{ display: 'inline-block', marginLeft: '8px' }}
                   animate={{ rotate: [0, 10, -10, 0] }}
@@ -341,7 +351,7 @@ const PricingSection = () => {
             <VStack align="start" spacing={2}>
               <Text fontSize="2xl" fontWeight="bold">{selectedPlan?.name}</Text>
               <Badge colorScheme="blue" fontSize="md" px={3} py={1}>
-                ${selectedPlan?.price} Anual
+                {selectedPlan?.name === 'Alef (א)' ? `$${selectedPlan?.price} Anual` : 'Próximamente'}
               </Badge>
             </VStack>
           </ModalHeader>
