@@ -1,6 +1,5 @@
 import {
   Box,
-  Container,
   Heading,
   Text,
   VStack,
@@ -18,187 +17,118 @@ import {
   FormControl,
   FormLabel,
   useToast,
+  TabPanel,
+  TabPanels,
+  Spinner,
 } from '@chakra-ui/react';
-import { FaCalendarAlt, FaStar, FaExchangeAlt, FaCheckCircle, FaBookOpen, FaUser, FaClock, FaMapMarkerAlt, FaBuilding, FaSpinner, FaHistory, FaTools } from 'react-icons/fa';
+import { FaCalendarAlt, FaStar, FaExchangeAlt, FaCheckCircle, FaBookOpen, FaUser, FaClock, FaMapMarkerAlt, FaBuilding, FaSpinner, FaHistory } from 'react-icons/fa';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import SupabaseSetup from './SupabaseSetup';
 import { createParashaRequest, getUserParashaRequests } from '../services/parashaService';
-import FirebaseSetup from './FirebaseSetup';
 
 const hebrewDaysSpanish = [
   'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'
 ];
 
-const HEBREW_MONTHS = [
-  'Tishrei', 'Cheshvan', 'Kislev', 'Tevet', 'Shevat', 'Adar',
-  'Nissan', 'Iyar', 'Sivan', 'Tamuz', 'Av', 'Elul'
-];
-
-const HEBREW_MONTHS_LEAP = [
-  'Tishrei', 'Cheshvan', 'Kislev', 'Tevet', 'Shevat', 'Adar I', 'Adar II',
-  'Nissan', 'Iyar', 'Sivan', 'Tamuz', 'Av', 'Elul'
-];
-
-// Conversión precisa de calendario gregoriano a hebreo usando algoritmos estándar
-const convertToHebrew = (gregorianDate) => {
-  try {
-    const date = new Date(gregorianDate);
-    const dayOfWeek = hebrewDaysSpanish[date.getDay()];
-    
-    // Convertir fecha gregoriana a día juliano
-    const jd = gregorianToJulian(date);
-    
-    // Convertir día juliano a fecha hebrea
-    const hebrewDate = julianToHebrew(jd);
-    
-    const monthName = getHebrewMonthName(hebrewDate.month, hebrewDate.isLeap);
-    const formatted = `${dayOfWeek}, ${hebrewDate.day} de ${monthName}, ${hebrewDate.year}`;
-    
-    return {
-      year: hebrewDate.year,
-      month: monthName,
-      day: hebrewDate.day,
-      dayOfWeek: dayOfWeek,
-      formatted: formatted,
-      isValid: true
-    };
-  } catch (error) {
-    console.error('Error converting date:', error);
-    return {
-      year: 'Error',
-      month: 'Error',
-      day: 'Error',
-      dayOfWeek: 'Error',
-      formatted: 'Error en la conversión',
-      isValid: false
-    };
-  }
-};
-
-// Convierte fecha gregoriana a día juliano
-function gregorianToJulian(date) {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  
-  const a = Math.floor((14 - month) / 12);
-  const y = year - a;
-  const m = month + 12 * a - 3;
-  
-  return day + Math.floor((153 * m + 2) / 5) + 365 * y + 
-         Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + 1721119;
-}
-
-// Convierte día juliano a fecha hebrea
-function julianToHebrew(jd) {
-  // Día juliano del epoch hebreo (1 Tishrei 1 = 7 octubre 3761 BCE)
-  const HEBREW_EPOCH = 347998;
-  
-  // Días transcurridos desde el epoch hebreo
-  const d = jd - HEBREW_EPOCH;
-  
-  // Calcular año hebreo aproximado
-  let year = Math.floor(d / 365.25) + 1;
-  
-  // Refinar el año
-  while (hebrewElapsedDays(year) < d) {
-    year++;
-  }
-  year--;
-  
-  // Días transcurridos en el año actual
-  const yearStart = hebrewElapsedDays(year);
-  const dayInYear = d - yearStart + 1;
-  
-  // Determinar mes y día
-  const isLeap = isHebrewLeapYear(year);
-  const monthLengths = getMonthLengths(year);
-  
-  let month = 1;
-  let dayInMonth = dayInYear;
-  
-  for (let i = 0; i < monthLengths.length; i++) {
-    if (dayInMonth <= monthLengths[i]) {
-      month = i + 1;
-      break;
-    }
-    dayInMonth -= monthLengths[i];
-  }
-  
-  return {
-    year: year,
-    month: month,
-    day: Math.max(1, Math.floor(dayInMonth)),
-    isLeap: isLeap
-  };
-}
-
-// Calcula días transcurridos desde el epoch hasta el inicio del año dado
-function hebrewElapsedDays(year) {
-  const monthsElapsed = Math.floor(((235 * year) - 234) / 19);
-  const partsElapsed = 12084 + (13753 * monthsElapsed);
-  const day = 29 * monthsElapsed + Math.floor(partsElapsed / 25920);
-  
-  if (((3 * (day + 1)) % 7) < 3) {
-    return day + 1;
-  } else {
-    return day;
-  }
-}
-
-// Determina si un año hebreo es bisiesto
-function isHebrewLeapYear(year) {
-  return ((7 * year + 1) % 19) < 7;
-}
-
-// Obtiene las longitudes de los meses para un año dado
-function getMonthLengths(year) {
-  const isLeap = isHebrewLeapYear(year);
-  const yearLength = hebrewElapsedDays(year + 1) - hebrewElapsedDays(year);
-  
-  // Longitudes base de los meses
-  let months = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29]; // 12 meses normales
-  
-  if (isLeap) {
-    // Año bisiesto: insertar Adar I antes de Adar
-    months.splice(5, 0, 29); // Adar I = 29 días
-    months[6] = 29; // Adar II = 29 días
-  }
-  
-  // Ajustar según la longitud del año
-  if (yearLength === 353 || yearLength === 383) {
-    // Año deficiente: Kislev tiene 29 días
-    months[2] = 29;
-  } else if (yearLength === 355 || yearLength === 385) {
-    // Año abundante: Cheshvan tiene 30 días
-    months[1] = 30;
-  }
-  
-  return months;
-}
-
-// Obtiene el nombre del mes hebreo
-function getHebrewMonthName(monthNum, isLeap) {
-  const normalMonths = ['Tishrei', 'Cheshvan', 'Kislev', 'Tevet', 'Shevat', 'Adar', 
-                       'Nissan', 'Iyar', 'Sivan', 'Tamuz', 'Av', 'Elul'];
-  
-  if (isLeap && monthNum >= 6) {
-    if (monthNum === 6) return 'Adar I';
-    if (monthNum === 7) return 'Adar II';
-    return normalMonths[monthNum - 2]; // Ajustar índice para meses después de Adar
-  }
-  
-  return normalMonths[monthNum - 1];
-}
-
 const CalendarConverter = () => {
+  // Simplified for brevity, same logic as before
   const [selectedDate, setSelectedDate] = useState('');
   const [hebrewDate, setHebrewDate] = useState(null);
+
+  // Conversión precisa de calendario gregoriano a hebreo usando algoritmos estándar
+  // Helper functions inline or imported
+  const convertToHebrew = (gregorianDate) => {
+    try {
+      const date = new Date(gregorianDate);
+      // Simple mock conversion for UI demo if complex logic omitted, 
+      // but preserving original logic is better.
+      // For brevity in this re-write, I will assume the logic functions are present
+      // or I'll just restore them.
+
+      // let's put back the logic functions
+      const hebrewDaysSpanish = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      const jd = gregorianToJulian(date);
+      const hDate = julianToHebrew(jd);
+      const monthName = getHebrewMonthName(hDate.month, hDate.isLeap);
+      const formatted = `${hebrewDaysSpanish[date.getDay()]}, ${hDate.day} de ${monthName}, ${hDate.year}`;
+
+      return {
+        year: hDate.year,
+        month: monthName,
+        day: hDate.day,
+        dayOfWeek: hebrewDaysSpanish[date.getDay()],
+        formatted: formatted,
+        isValid: true
+      };
+
+    } catch (error) {
+      console.error(error);
+      return { isValid: false, formatted: 'Error' };
+    }
+  };
+
+  function gregorianToJulian(date) {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const a = Math.floor((14 - month) / 12);
+    const y = year - a;
+    const m = month + 12 * a - 3;
+    return day + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + 1721119;
+  }
+
+  function julianToHebrew(jd) {
+    const HEBREW_EPOCH = 347998;
+    const d = jd - HEBREW_EPOCH;
+    let year = Math.floor(d / 365.25) + 1;
+    while (hebrewElapsedDays(year) < d) year++;
+    year--;
+    const yearStart = hebrewElapsedDays(year);
+    const dayInYear = d - yearStart + 1;
+    const isLeap = ((7 * year + 1) % 19) < 7;
+    const monthLengths = getMonthLengths(year);
+    let month = 1;
+    let dayInMonth = dayInYear;
+    for (let i = 0; i < monthLengths.length; i++) {
+      if (dayInMonth <= monthLengths[i]) { month = i + 1; break; }
+      dayInMonth -= monthLengths[i];
+    }
+    return { year, month, day: Math.max(1, Math.floor(dayInMonth)), isLeap };
+  }
+
+  function hebrewElapsedDays(year) {
+    const monthsElapsed = Math.floor(((235 * year) - 234) / 19);
+    const partsElapsed = 12084 + (13753 * monthsElapsed);
+    const day = 29 * monthsElapsed + Math.floor(partsElapsed / 25920);
+    return ((3 * (day + 1)) % 7) < 3 ? day + 1 : day;
+  }
+
+  function getMonthLengths(year) {
+    const isLeap = ((7 * year + 1) % 19) < 7;
+    const yearLength = hebrewElapsedDays(year + 1) - hebrewElapsedDays(year);
+    let months = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
+    if (isLeap) { months.splice(5, 0, 29); months[6] = 29; }
+    if (yearLength === 353 || yearLength === 383) months[2] = 29;
+    else if (yearLength === 355 || yearLength === 385) months[1] = 30;
+    return months;
+  }
+
+  function getHebrewMonthName(monthNum, isLeap) {
+    const normal = ['Tishrei', 'Cheshvan', 'Kislev', 'Tevet', 'Shevat', 'Adar', 'Nissan', 'Iyar', 'Sivan', 'Tamuz', 'Av', 'Elul'];
+    if (isLeap && monthNum >= 6) {
+      if (monthNum === 6) return 'Adar I';
+      if (monthNum === 7) return 'Adar II';
+      return normal[monthNum - 2];
+    }
+    return normal[monthNum - 1];
+  }
+
 
   const handleDateChange = (e) => {
     const date = e.target.value;
     setSelectedDate(date);
-    
+
     if (date) {
       const converted = convertToHebrew(date);
       setHebrewDate(converted);
@@ -227,10 +157,9 @@ const CalendarConverter = () => {
           </VStack>
         </HStack>
       </CardHeader>
-      
+
       <CardBody>
         <VStack spacing={6} align="stretch">
-          {/* Input de fecha */}
           <VStack spacing={3} align="stretch">
             <Text fontWeight="medium" color="gray.700">
               Selecciona una fecha gregoriana:
@@ -255,7 +184,6 @@ const CalendarConverter = () => {
             </HStack>
           </VStack>
 
-          {/* Resultado */}
           {hebrewDate && (
             <>
               <Divider />
@@ -263,33 +191,33 @@ const CalendarConverter = () => {
                 <Flex align="center" justify="center">
                   <Icon as={FaExchangeAlt} color="#38BDF8" boxSize={5} />
                 </Flex>
-                
-                <Card 
-                  bg={hebrewDate.isValid ? "blue.50" : "red.50"} 
-                  borderColor={hebrewDate.isValid ? "blue.200" : "red.200"} 
+
+                <Card
+                  bg={hebrewDate.isValid ? "blue.50" : "red.50"}
+                  borderColor={hebrewDate.isValid ? "blue.200" : "red.200"}
                   borderWidth={1}
                 >
                   <CardBody>
                     <VStack spacing={3}>
-                      <Badge 
-                        colorScheme={hebrewDate.isValid ? "blue" : "red"} 
-                        fontSize="sm" 
-                        px={3} 
+                      <Badge
+                        colorScheme={hebrewDate.isValid ? "blue" : "red"}
+                        fontSize="sm"
+                        px={3}
                         py={1}
                       >
                         {hebrewDate.isValid ? "Fecha Hebrea" : "Error"}
                       </Badge>
-                      
+
                       <VStack spacing={2}>
-                        <Text 
-                          fontSize="xl" 
-                          fontWeight="bold" 
-                          textAlign="center" 
+                        <Text
+                          fontSize="xl"
+                          fontWeight="bold"
+                          textAlign="center"
                           color={hebrewDate.isValid ? "blue.800" : "red.800"}
                         >
                           {hebrewDate.formatted}
                         </Text>
-                        
+
                         {hebrewDate.isValid && (
                           <SimpleGrid columns={3} spacing={4} w="100%">
                             <VStack>
@@ -314,7 +242,6 @@ const CalendarConverter = () => {
             </>
           )}
 
-          {/* Información adicional */}
           <Card bg="green.50" borderColor="green.200" borderWidth={1}>
             <CardBody>
               <VStack spacing={2} align="start">
@@ -325,7 +252,7 @@ const CalendarConverter = () => {
                   </Text>
                 </HStack>
                 <Text fontSize="sm" color="green.700">
-                  Esta herramienta usa algoritmos matemáticos precisos para conversiones exactas del 
+                  Esta herramienta usa algoritmos matemáticos precisos para conversiones exactas del
                   calendario hebreo. Incluye años bisiestos y es ideal para fechas de festividades.
                 </Text>
               </VStack>
@@ -337,8 +264,8 @@ const CalendarConverter = () => {
   );
 };
 
-// Componente para el formulario de Parashá
 const ParashaForm = () => {
+  // ... ParashaForm implementation remains largely the same but uses userId correctly
   const { user } = useAuth();
   const [formData, setFormData] = useState({
     nombre: '',
@@ -352,14 +279,17 @@ const ParashaForm = () => {
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   const toast = useToast();
 
-  // Load user's previous requests
   useEffect(() => {
     const loadUserRequests = async () => {
-      if (!user?.uid) return;
-      
+      // In Supabase Auth, user object has 'id'. In Firebase it had 'uid'.
+      // Our useAuth returns session.user which has 'id'. 
+      const userId = user?.id || user?.uid;
+
+      if (!userId) return;
+
       setIsLoadingRequests(true);
       try {
-        const result = await getUserParashaRequests(user.uid);
+        const result = await getUserParashaRequests(userId);
         if (result.success) {
           setUserRequests(result.data);
         }
@@ -383,8 +313,9 @@ const ParashaForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!user?.uid) {
+    const userId = user?.id || user?.uid;
+
+    if (!userId) {
       toast({
         title: "Error de autenticación",
         description: "Debes estar logueado para enviar una solicitud",
@@ -394,10 +325,9 @@ const ParashaForm = () => {
       });
       return;
     }
-    
-    // Validar que todos los campos estén completos
-    if (!formData.nombre || !formData.fechaNacimiento || !formData.horaNacimiento || 
-        !formData.lugarNacimiento || !formData.ubicacionBarmitzva) {
+
+    if (!formData.nombre || !formData.fechaNacimiento || !formData.horaNacimiento ||
+      !formData.lugarNacimiento || !formData.ubicacionBarmitzva) {
       toast({
         title: "Campos incompletos",
         description: "Por favor completa todos los campos",
@@ -411,9 +341,8 @@ const ParashaForm = () => {
     setIsSubmitting(true);
 
     try {
-      // Crear solicitud en Firebase
       const result = await createParashaRequest({
-        userId: user.uid,
+        userId: userId,
         ...formData
       });
 
@@ -426,7 +355,6 @@ const ParashaForm = () => {
           isClosable: true,
         });
 
-        // Limpiar formulario
         setFormData({
           nombre: '',
           fechaNacimiento: '',
@@ -435,8 +363,7 @@ const ParashaForm = () => {
           ubicacionBarmitzva: ''
         });
 
-        // Recargar solicitudes del usuario
-        const updatedRequests = await getUserParashaRequests(user.uid);
+        const updatedRequests = await getUserParashaRequests(userId);
         if (updatedRequests.success) {
           setUserRequests(updatedRequests.data);
         }
@@ -470,12 +397,10 @@ const ParashaForm = () => {
           </VStack>
         </HStack>
       </CardHeader>
-      
+
       <CardBody>
         <form onSubmit={handleSubmit}>
           <VStack spacing={6} align="stretch">
-            
-            {/* Nombre */}
             <FormControl isRequired>
               <FormLabel>
                 <HStack spacing={2}>
@@ -494,7 +419,6 @@ const ParashaForm = () => {
               />
             </FormControl>
 
-            {/* Fecha de nacimiento */}
             <FormControl isRequired>
               <FormLabel>
                 <HStack spacing={2}>
@@ -513,7 +437,6 @@ const ParashaForm = () => {
               />
             </FormControl>
 
-            {/* Hora de nacimiento */}
             <FormControl isRequired>
               <FormLabel>
                 <HStack spacing={2}>
@@ -532,7 +455,6 @@ const ParashaForm = () => {
               />
             </FormControl>
 
-            {/* Lugar de nacimiento */}
             <FormControl isRequired>
               <FormLabel>
                 <HStack spacing={2}>
@@ -551,7 +473,6 @@ const ParashaForm = () => {
               />
             </FormControl>
 
-            {/* Ubicación donde hará el Barmitzva */}
             <FormControl isRequired>
               <FormLabel>
                 <HStack spacing={2}>
@@ -570,7 +491,6 @@ const ParashaForm = () => {
               />
             </FormControl>
 
-            {/* Botón de envío */}
             <Button
               type="submit"
               colorScheme="messenger"
@@ -585,7 +505,6 @@ const ParashaForm = () => {
               Enviar información
             </Button>
 
-            {/* Solicitudes anteriores */}
             {userRequests.length > 0 && (
               <Card bg="blue.50" borderColor="blue.200" borderWidth={1}>
                 <CardBody>
@@ -598,7 +517,7 @@ const ParashaForm = () => {
                     </HStack>
                     {isLoadingRequests ? (
                       <HStack spacing={2}>
-                        <Icon as={FaSpinner} spin color="blue.500" />
+                        <Spinner size="sm" color="blue.500" />
                         <Text fontSize="sm" color="blue.600">Cargando solicitudes...</Text>
                       </HStack>
                     ) : (
@@ -613,17 +532,17 @@ const ParashaForm = () => {
                                 {new Date(request.createdAt).toLocaleDateString('es-ES')}
                               </Text>
                             </VStack>
-                            <Badge 
+                            <Badge
                               colorScheme={
                                 request.status === 'completada' ? 'green' :
-                                request.status === 'procesando' ? 'blue' :
-                                request.status === 'pendiente' ? 'yellow' : 'red'
+                                  request.status === 'procesando' ? 'blue' :
+                                    request.status === 'pendiente' ? 'yellow' : 'red'
                               }
                               size="sm"
                             >
                               {request.status === 'completada' ? 'Completada' :
-                               request.status === 'procesando' ? 'Procesando' :
-                               request.status === 'pendiente' ? 'Pendiente' : 'Rechazada'}
+                                request.status === 'procesando' ? 'Procesando' :
+                                  request.status === 'pendiente' ? 'Pendiente' : 'Rechazada'}
                             </Badge>
                           </HStack>
                         ))}
@@ -639,7 +558,6 @@ const ParashaForm = () => {
               </Card>
             )}
 
-            {/* Información adicional */}
             <Card bg="yellow.50" borderColor="yellow.200" borderWidth={1}>
               <CardBody>
                 <VStack spacing={2} align="start">
@@ -650,7 +568,7 @@ const ParashaForm = () => {
                     </Text>
                   </HStack>
                   <Text fontSize="sm" color="yellow.700">
-                    Tus datos se guardan de forma segura y serán utilizados únicamente para 
+                    Tus datos se guardan de forma segura y serán utilizados únicamente para
                     calcular tu parashá y preparar tu Barmitzva.
                   </Text>
                 </VStack>
@@ -668,7 +586,7 @@ const HerramientasPage = () => {
   return (
     <Box w="100%" maxW="95vw" mx="auto" py={8} px={{ base: 4, md: 6, lg: 8 }}>
       <VStack spacing={8} align="stretch">
-        
+
         {/* Header */}
         <Box>
           <Heading size="xl" color="gray.800" mb={2}>
@@ -681,32 +599,14 @@ const HerramientasPage = () => {
 
         {/* Herramientas Grid */}
         <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8}>
-          
+
           {/* Conversor de Calendario */}
           <CalendarConverter />
-          
+
           {/* Formulario de Parashá */}
           <ParashaForm />
-          
-        </SimpleGrid>
 
-        {/* Configuración de Firebase */}
-        <Card>
-          <CardHeader>
-            <HStack spacing={3}>
-              <Icon as={FaTools} color="#F59E0B" boxSize={6} />
-              <VStack align="start" spacing={0}>
-                <Heading size="md">Configuración de Firebase</Heading>
-                <Text fontSize="sm" color="gray.600">
-                  Configura Firebase para que los foros funcionen en tiempo real
-                </Text>
-              </VStack>
-            </HStack>
-          </CardHeader>
-          <CardBody>
-            <FirebaseSetup />
-          </CardBody>
-        </Card>
+        </SimpleGrid>
 
         {/* Información sobre las herramientas */}
         <Card bg="blue.50" borderColor="blue.200" borderWidth={1}>
@@ -738,4 +638,4 @@ const HerramientasPage = () => {
   );
 };
 
-export default HerramientasPage; 
+export default HerramientasPage;

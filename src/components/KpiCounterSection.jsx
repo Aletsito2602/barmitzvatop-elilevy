@@ -2,12 +2,12 @@ import { Box, SimpleGrid, VStack, Text, useColorModeValue } from '@chakra-ui/rea
 import { useEffect, useState } from 'react';
 
 const kpis = [
-  { label: 'Años', value: 15 },
-  { label: 'Meses', value: 180 },
-  { label: 'Semanas', value: 772 },
-  { label: 'Días', value: 4632 },
-  { label: 'Horas', value: 18528 },
-  { label: 'Minutos', value: 1111680 },
+  { label: 'Años', value: 17 },
+  { label: 'Meses', value: 204 },
+  { label: 'Semanas', value: 816 },
+  { label: 'Días', value: 5712 },
+  { label: 'Horas', value: 137088 },
+  { label: 'Minutos', value: 8225280 },
 ];
 
 function useCountUp(target, duration = 1500) {

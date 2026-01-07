@@ -1,27 +1,28 @@
-import { collection, addDoc, query, orderBy, getDocs, doc, getDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { supabase } from '../supabase/client';
 
 // Classes/Lessons Management
 export const createClass = async (classData) => {
   try {
-    const classesRef = collection(db, 'classes');
-    const newClass = {
-      title: classData.title,
-      classNumber: classData.classNumber,
-      youtubeLink: classData.youtubeLink,
-      videoType: classData.videoType || 'youtube',
-      description: classData.description || '',
-      duration: classData.duration || '',
-      difficulty: classData.difficulty || 'basico',
-      category: classData.category || 'alef',
-      isActive: true,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-    
-    const docRef = await addDoc(classesRef, newClass);
-    console.log('Class created with ID: ', docRef.id);
-    return { success: true, id: docRef.id };
+    const { data: newClass, error } = await supabase
+      .from('classes')
+      .insert({
+        title: classData.title,
+        class_number: parseInt(classData.classNumber),
+        youtube_link: classData.youtubeLink,
+        video_type: classData.videoType || 'youtube',
+        description: classData.description || '',
+        duration: parseInt(classData.duration),
+        difficulty: classData.difficulty || 'basico',
+        category: classData.category || 'alef',
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    console.log('Class created with ID: ', newClass.id);
+    return { success: true, id: newClass.id };
   } catch (error) {
     console.error('Error creating class:', error);
     return { success: false, error: error.message };
@@ -30,34 +31,30 @@ export const createClass = async (classData) => {
 
 export const getAllClasses = async () => {
   try {
-    console.log('Getting classes from Firebase...');
-    const classesRef = collection(db, 'classes');
-    
-    // Try without orderBy first in case of index issues
-    let querySnapshot;
-    try {
-      const q = query(classesRef, orderBy('classNumber', 'asc'));
-      querySnapshot = await getDocs(q);
-    } catch (indexError) {
-      console.warn('OrderBy failed, trying without sorting:', indexError);
-      querySnapshot = await getDocs(classesRef);
-    }
-    
-    const classes = [];
-    
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      classes.push({ 
-        id: doc.id, 
-        ...data,
-        // Ensure classNumber is a number for sorting
-        classNumber: parseInt(data.classNumber) || 0
-      });
-    });
-    
-    // Sort manually if needed
-    classes.sort((a, b) => a.classNumber - b.classNumber);
-    
+    console.log('Getting classes from Supabase...');
+
+    const { data, error } = await supabase
+      .from('classes')
+      .select('*')
+      .order('class_number', { ascending: true });
+
+    if (error) throw error;
+
+    const classes = data.map(cls => ({
+      id: cls.id,
+      title: cls.title,
+      classNumber: cls.class_number,
+      youtubeLink: cls.youtube_link,
+      videoType: cls.video_type,
+      description: cls.description,
+      duration: cls.duration,
+      difficulty: cls.difficulty,
+      category: cls.category,
+      isActive: cls.is_active,
+      createdAt: cls.created_at,
+      updatedAt: cls.updated_at
+    }));
+
     console.log('Classes loaded successfully:', classes.length);
     return { success: true, data: classes };
   } catch (error) {
@@ -68,11 +65,28 @@ export const getAllClasses = async () => {
 
 export const getClassById = async (classId) => {
   try {
-    const classRef = doc(db, 'classes', classId);
-    const classSnap = await getDoc(classRef);
-    
-    if (classSnap.exists()) {
-      return { success: true, data: { id: classSnap.id, ...classSnap.data() } };
+    const { data, error } = await supabase
+      .from('classes')
+      .select('*')
+      .eq('id', classId)
+      .single();
+
+    if (error) throw error;
+
+    if (data) {
+      const cls = {
+        id: data.id,
+        title: data.title,
+        classNumber: data.class_number,
+        youtubeLink: data.youtube_link,
+        videoType: data.video_type,
+        description: data.description,
+        duration: data.duration,
+        difficulty: data.difficulty,
+        category: data.category,
+        isActive: data.is_active,
+      };
+      return { success: true, data: cls };
     } else {
       return { success: false, error: 'Class not found' };
     }
@@ -84,11 +98,25 @@ export const getClassById = async (classId) => {
 
 export const updateClass = async (classId, updates) => {
   try {
-    const classRef = doc(db, 'classes', classId);
-    await updateDoc(classRef, {
-      ...updates,
-      updatedAt: serverTimestamp()
-    });
+    const dbUpdates = {};
+    if (updates.title) dbUpdates.title = updates.title;
+    if (updates.classNumber) dbUpdates.class_number = parseInt(updates.classNumber);
+    if (updates.youtubeLink) dbUpdates.youtube_link = updates.youtubeLink;
+    if (updates.videoType) dbUpdates.video_type = updates.videoType;
+    if (updates.description) dbUpdates.description = updates.description;
+    if (updates.duration) dbUpdates.duration = parseInt(updates.duration);
+    if (updates.difficulty) dbUpdates.difficulty = updates.difficulty;
+    if (updates.category) dbUpdates.category = updates.category;
+
+    const { error } = await supabase
+      .from('classes')
+      .update({
+        ...dbUpdates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', classId);
+
+    if (error) throw error;
     return { success: true };
   } catch (error) {
     console.error('Error updating class:', error);
@@ -98,8 +126,12 @@ export const updateClass = async (classId, updates) => {
 
 export const deleteClass = async (classId) => {
   try {
-    const classRef = doc(db, 'classes', classId);
-    await deleteDoc(classRef);
+    const { error } = await supabase
+      .from('classes')
+      .delete()
+      .eq('id', classId);
+
+    if (error) throw error;
     return { success: true };
   } catch (error) {
     console.error('Error deleting class:', error);
@@ -153,14 +185,14 @@ export const getVideoThumbnail = (url, videoType) => {
 
 export const formatDuration = (duration) => {
   if (!duration) return 'N/A';
-  
+
   // If duration is in minutes (number)
   if (typeof duration === 'number') {
     const hours = Math.floor(duration / 60);
     const minutes = duration % 60;
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
   }
-  
+
   // If duration is already formatted (string)
   return duration;
 };
@@ -170,12 +202,12 @@ export const initializeSampleClasses = async () => {
   try {
     // Check if classes already exist
     const classesResult = await getAllClasses();
-    
+
     if (classesResult.success && classesResult.data.length > 0) {
       console.log('Classes already exist');
       return { success: true, message: 'Classes already exist' };
     }
-    
+
     const sampleClasses = [
       {
         title: 'Introducción al Curso Barmitzva',
@@ -223,12 +255,12 @@ export const initializeSampleClasses = async () => {
         category: 'tefila'
       }
     ];
-    
+
     // Create sample classes
     for (const classData of sampleClasses) {
       await createClass(classData);
     }
-    
+
     return { success: true, message: 'Sample classes created successfully' };
   } catch (error) {
     console.error('Error initializing sample classes:', error);

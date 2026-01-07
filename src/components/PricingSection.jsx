@@ -24,7 +24,7 @@ import {
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaBook, FaLightbulb, FaFont, FaPrayingHands, FaVideo, FaMusic, FaFilePdf, FaCertificate, FaPhone, FaCheck, FaPenNib, FaInfoCircle } from 'react-icons/fa';
+import { FaBook, FaLightbulb, FaFont, FaPrayingHands, FaVideo, FaMusic, FaFilePdf, FaCertificate, FaPhone, FaCheck, FaPenNib, FaInfoCircle, FaScroll, FaCalendarAlt } from 'react-icons/fa';
 
 const plans = [
   {
@@ -35,9 +35,12 @@ const plans = [
       { icon: FaBook, text: 'Introducción al curso' },
       { icon: FaLightbulb, text: 'Consejos para el curso' },
       { icon: FaFont, text: 'Letras y vocales básicas' },
-      { icon: FaPrayingHands, text: 'Berajot básicas: Talit, Tefilín, Sheejeiyanu' },
+      { icon: FaPrayingHands, text: 'Berajot principales: Talit, Tefilín, Sheejeyanu' },
+      { icon: FaMusic, text: 'Rezo H\' melej (cantado)' },
+      { icon: FaScroll, text: 'Rezo Shema (con taamim)' },
+      { icon: FaCalendarAlt, text: 'Parashá (según tu fecha de nacimiento, te ayudaré a saber cuál es tu Parashá y la asignaré para ti en la plataforma)' },
       { icon: FaVideo, text: 'Video: Puesta del Tefilín' },
-      { icon: FaPrayingHands, text: 'Kidush de shabat (viernes a la noche)' },
+      { icon: FaPrayingHands, text: 'Kidush de Shabat (viernes a la noche)' },
     ],
     color: '#F59E0B',
     detailedInfo: {
@@ -253,7 +256,7 @@ const PricingSection = () => {
               >
                 {idx === 0 ? (
                   <VStack spacing={1}>
-                    <Text as="span" fontSize="lg" textDecoration="line-through" color="gray.400">$500</Text>
+                    <Text as="span" fontSize="lg" textDecoration="line-through" color="black" fontWeight="semibold">$500</Text>
                     <Text as="span" fontSize="2xl" fontWeight="bold">${plan.price}</Text>
                     <Text as="span" fontSize="md" fontWeight="normal">Anual</Text>
                   </VStack>

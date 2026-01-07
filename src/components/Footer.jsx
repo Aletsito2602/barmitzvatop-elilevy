@@ -16,10 +16,10 @@ const Footer = () => {
               Un espacio para aprender, conectar y crecer, fortaleciendo nuestras bases, tradiciones y valores.
             </Text>
             <HStack spacing={4} pt={2}>
-              <IconButton as="a" href="#" icon={<FaInstagram />} aria-label="Instagram" size="lg" variant="ghost" color="black" _hover={{ color: '#38BDF8' }} />
-              <IconButton as="a" href="#" icon={<FaFacebook />} aria-label="Facebook" size="lg" variant="ghost" color="black" _hover={{ color: '#38BDF8' }} />
-              <IconButton as="a" href="#" icon={<FaYoutube />} aria-label="YouTube" size="lg" variant="ghost" color="black" _hover={{ color: '#38BDF8' }} />
-              <IconButton as="a" href="#" icon={<FaTiktok />} aria-label="TikTok" size="lg" variant="ghost" color="black" _hover={{ color: '#38BDF8' }} />
+              <IconButton as="a" href="https://www.instagram.com/barmitzvatop" target="_blank" rel="noopener noreferrer" icon={<FaInstagram />} aria-label="Instagram" size="lg" variant="ghost" color="black" _hover={{ color: '#38BDF8' }} />
+              <IconButton as="a" href="https://www.facebook.com/share/1A8n5FBfM3/" target="_blank" rel="noopener noreferrer" icon={<FaFacebook />} aria-label="Facebook" size="lg" variant="ghost" color="black" _hover={{ color: '#38BDF8' }} />
+              <IconButton as="a" href="https://youtube.com/@barmitzvatop" target="_blank" rel="noopener noreferrer" icon={<FaYoutube />} aria-label="YouTube" size="lg" variant="ghost" color="black" _hover={{ color: '#38BDF8' }} />
+              <IconButton as="a" href="https://www.tiktok.com/@barmitzvatop" target="_blank" rel="noopener noreferrer" icon={<FaTiktok />} aria-label="TikTok" size="lg" variant="ghost" color="black" _hover={{ color: '#38BDF8' }} />
             </HStack>
           </VStack>
 

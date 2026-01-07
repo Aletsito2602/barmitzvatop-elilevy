@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
-import { getUserProfile, getUserProgress, getUserActivities, calculatePersonalParasha } from '../services/userService';
+import { getUserProfile, getUserProgress, getUserActivities, calculatePersonalParasha, checkIsAdmin } from '../services/userService';
 
 export const useUser = () => {
   const { user } = useAuth();
@@ -8,13 +8,14 @@ export const useUser = () => {
   const [userProgress, setUserProgress] = useState(null);
   const [userActivities, setUserActivities] = useState([]);
   const [personalParasha, setPersonalParasha] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
       console.log('🔍 useUser: fetchUserData called with user:', user);
-      
+
       if (!user?.uid) {
         console.log('❌ useUser: No user UID found');
         setLoading(false);
@@ -24,14 +25,14 @@ export const useUser = () => {
       try {
         setLoading(true);
         console.log('📥 useUser: Fetching data for UID:', user.uid);
-        
+
         // Fetch user profile
         const profileResult = await getUserProfile(user.uid);
         console.log('👤 useUser: Profile result:', profileResult);
         if (profileResult.success) {
           setUserProfile(profileResult.data);
           console.log('✅ useUser: Profile set:', profileResult.data);
-          
+
           // Calculate personal parasha if birth date exists
           if (profileResult.data.birthDate) {
             const parasha = calculatePersonalParasha(profileResult.data.birthDate);
@@ -58,6 +59,12 @@ export const useUser = () => {
           setUserActivities(activitiesResult.data);
         }
 
+        // Check if admin
+        const adminResult = await checkIsAdmin(user.uid);
+        if (adminResult.success) {
+          setIsAdmin(adminResult.isAdmin);
+        }
+
       } catch (err) {
         console.error('💥 useUser: Error fetching data:', err);
         setError(err.message);
@@ -75,7 +82,7 @@ export const useUser = () => {
       if (profileResult.success) {
         setUserProfile(profileResult.data);
       }
-      
+
       const progressResult = await getUserProgress(user.uid);
       if (progressResult.success) {
         setUserProgress(progressResult.data);
@@ -87,7 +94,9 @@ export const useUser = () => {
     userProfile,
     userProgress,
     userActivities,
+    userActivities,
     personalParasha,
+    isAdmin,
     loading,
     error,
     refreshUserData,

@@ -63,9 +63,12 @@ const Checkout = () => {
         { text: 'Introducción al curso' },
         { text: 'Consejos para el curso' },
         { text: 'Letras y vocales básicas' },
-        { text: 'Berajot básicas: Talit, Tefilín, Sheejeiyanu' },
+        { text: 'Berajot principales: Talit, Tefilín, Sheejeyanu' },
+        { text: 'Rezo H\' melej (cantado)' },
+        { text: 'Rezo Shema (con taamim)' },
+        { text: 'Parashá (según tu fecha de nacimiento, te ayudaré a saber cuál es tu Parashá y la asignaré para ti en la plataforma)' },
         { text: 'Video: Puesta del Tefilín' },
-        { text: 'Kidush de shabat (viernes a la noche)' }
+        { text: 'Kidush de Shabat (viernes a la noche)' }
       ]
     };
     // Guardar el plan por defecto

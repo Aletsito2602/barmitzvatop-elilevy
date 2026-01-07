@@ -78,19 +78,7 @@ const StrugglesSection = () => (
                 whileHover={{ x: 5, transition: { duration: 0.2 } }}
               >
                 <HStack align="start">
-                  <motion.div
-                    animate={{ 
-                      scale: [1, 1.2, 1],
-                      rotate: [0, 5, -5, 0]
-                    }}
-                    transition={{ 
-                      duration: 2, 
-                      repeat: Infinity, 
-                      repeatDelay: 3 + idx * 0.3
-                    }}
-                  >
-                    <Icon as={WarningIcon} color="#F59E0B" boxSize={5} mt={1} />
-                  </motion.div>
+                  <Icon as={WarningIcon} color="#F59E0B" boxSize={5} mt={1} />
                   <Text color="gray.700">{item}</Text>
                 </HStack>
               </motion.div>
@@ -136,18 +124,7 @@ const StrugglesSection = () => (
                 whileHover={{ x: -5, transition: { duration: 0.2 } }}
               >
                 <HStack align="start">
-                  <motion.div
-                    animate={{ 
-                      scale: [1, 1.2, 1],
-                      rotate: [0, 360]
-                    }}
-                    transition={{ 
-                      scale: { duration: 1.5, repeat: Infinity, repeatDelay: 2 + idx * 0.3 },
-                      rotate: { duration: 3, repeat: Infinity, repeatDelay: 5 + idx * 0.5 }
-                    }}
-                  >
-                    <Icon as={CheckCircleIcon} color="#D97706" boxSize={5} mt={1} />
-                  </motion.div>
+                  <Icon as={CheckCircleIcon} color="#D97706" boxSize={5} mt={1} />
                   <Text color="gray.700">{item}</Text>
                 </HStack>
               </motion.div>

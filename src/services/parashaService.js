@@ -1,99 +1,70 @@
-import { collection, addDoc, query, orderBy, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, where } from 'firebase/firestore';
-import { db, auth } from '../firebase/config';
+import { supabase } from '../supabase/client';
 
 // Parasha Requests Management
 export const createParashaRequest = async (requestData) => {
   try {
     console.log('Creating parasha request with data:', requestData);
-    
+
     // Check if user is authenticated
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
       console.error('User not authenticated');
       return { success: false, error: 'Usuario no autenticado' };
     }
-    
-    console.log('Current user:', currentUser.uid);
-    
-    const requestsRef = collection(db, 'parashaRequests');
-    const newRequest = {
-      userId: requestData.userId || currentUser.uid,
-      nombre: requestData.nombre,
-      fechaNacimiento: requestData.fechaNacimiento,
-      horaNacimiento: requestData.horaNacimiento,
-      lugarNacimiento: requestData.lugarNacimiento,
-      ubicacionBarmitzva: requestData.ubicacionBarmitzva,
-      
-      // Status tracking
-      status: 'pendiente', // pendiente, procesando, completada, rechazada
-      parashaAsignada: null,
-      
-      // Timestamps
-      createdAt: new Date().toISOString(), // Use regular timestamp instead of serverTimestamp
-      updatedAt: new Date().toISOString(),
-      processedAt: null,
-      completedAt: null
-    };
-    
-    console.log('Attempting to add document to Firestore...');
-    console.log('New request object:', newRequest);
-    
-    const docRef = await addDoc(requestsRef, newRequest);
-    console.log('Parasha request created with ID: ', docRef.id);
-    return { success: true, id: docRef.id };
+
+    console.log('Current user:', user.id);
+
+    const { data: newRequest, error } = await supabase
+      .from('parasha_requests')
+      .insert({
+        user_id: requestData.userId || user.id,
+        full_name: requestData.nombre,
+        birth_date: requestData.fechaNacimiento,
+        birth_time: requestData.horaNacimiento,
+        birth_place: requestData.lugarNacimiento,
+        barmitzva_location: requestData.ubicacionBarmitzva,
+        status: 'pendiente'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    console.log('Parasha request created with ID: ', newRequest.id);
+    return { success: true, id: newRequest.id };
   } catch (error) {
     console.error('Error creating parasha request:', error);
-    console.error('Error details:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack
-    });
-    
-    // Fallback: Use localStorage if Firestore fails
-    try {
-      const fallbackId = Date.now().toString();
-      const fallbackRequest = {
-        id: fallbackId,
-        ...requestData,
-        status: 'pendiente',
-        createdAt: new Date().toISOString(),
-        fallback: true
-      };
-      
-      const existingRequests = JSON.parse(localStorage.getItem('parashaRequests') || '[]');
-      existingRequests.push(fallbackRequest);
-      localStorage.setItem('parashaRequests', JSON.stringify(existingRequests));
-      
-      console.log('Saved to localStorage as fallback');
-      return { success: true, id: fallbackId, fallback: true };
-    } catch (fallbackError) {
-      console.error('Fallback also failed:', fallbackError);
-      return { success: false, error: error.message };
-    }
+    return { success: false, error: error.message };
   }
 };
 
 export const getAllParashaRequests = async () => {
   try {
-    console.log('Getting parasha requests from Firebase...');
-    const requestsRef = collection(db, 'parashaRequests');
-    const q = query(requestsRef, orderBy('createdAt', 'desc'));
-    const querySnapshot = await getDocs(q);
-    
-    const requests = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      requests.push({ 
-        id: doc.id, 
-        ...data,
-        // Convert Firestore timestamps to readable format
-        createdAt: data.createdAt?.toDate?.() || new Date(),
-        updatedAt: data.updatedAt?.toDate?.() || new Date(),
-        processedAt: data.processedAt?.toDate?.() || null,
-        completedAt: data.completedAt?.toDate?.() || null
-      });
-    });
-    
+    console.log('Getting parasha requests from Supabase...');
+
+    const { data, error } = await supabase
+      .from('parasha_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const requests = data.map(req => ({
+      id: req.id,
+      userId: req.user_id,
+      nombre: req.full_name,
+      fechaNacimiento: req.birth_date,
+      horaNacimiento: req.birth_time,
+      lugarNacimiento: req.birth_place,
+      ubicacionBarmitzva: req.barmitzva_location,
+      status: req.status,
+      parashaAsignada: req.assigned_parasha,
+      createdAt: new Date(req.created_at),
+      updatedAt: new Date(req.updated_at),
+      processedAt: req.processed_at ? new Date(req.processed_at) : null
+    }));
+
     console.log('Parasha requests loaded successfully:', requests.length);
     return { success: true, data: requests };
   } catch (error) {
@@ -105,49 +76,33 @@ export const getAllParashaRequests = async () => {
 export const getUserParashaRequests = async (userId) => {
   try {
     console.log('Getting parasha requests for user:', userId);
-    
-    // Try to get from Firestore first
-    try {
-      const requestsRef = collection(db, 'parashaRequests');
-      const q = query(
-        requestsRef, 
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
-      
-      const requests = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        requests.push({ 
-          id: doc.id, 
-          ...data,
-          createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt),
-          updatedAt: data.updatedAt?.toDate?.() || new Date(data.updatedAt),
-          processedAt: data.processedAt?.toDate?.() || null,
-          completedAt: data.completedAt?.toDate?.() || null
-        });
-      });
-      
-      console.log('User parasha requests loaded from Firestore:', requests.length);
-      return { success: true, data: requests };
-    } catch (firestoreError) {
-      console.log('Firestore failed, trying localStorage fallback...');
-      
-      // Fallback to localStorage
-      const allRequests = JSON.parse(localStorage.getItem('parashaRequests') || '[]');
-      const userRequests = allRequests
-        .filter(request => request.userId === userId)
-        .map(request => ({
-          ...request,
-          createdAt: new Date(request.createdAt),
-          updatedAt: new Date(request.updatedAt || request.createdAt)
-        }))
-        .sort((a, b) => b.createdAt - a.createdAt);
-      
-      console.log('User parasha requests loaded from localStorage:', userRequests.length);
-      return { success: true, data: userRequests };
-    }
+
+    const { data, error } = await supabase
+      .from('parasha_requests')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const requests = data.map(req => ({
+      id: req.id,
+      userId: req.user_id,
+      nombre: req.full_name,
+      fechaNacimiento: req.birth_date,
+      horaNacimiento: req.birth_time,
+      lugarNacimiento: req.birth_place,
+      ubicacionBarmitzva: req.barmitzva_location,
+      status: req.status,
+      parashaAsignada: req.assigned_parasha,
+      createdAt: new Date(req.created_at),
+      updatedAt: new Date(req.updated_at),
+      processedAt: req.processed_at ? new Date(req.processed_at) : null
+    }));
+
+    console.log('User parasha requests loaded from Supabase:', requests.length);
+    return { success: true, data: requests };
+
   } catch (error) {
     console.error('Error getting user parasha requests:', error);
     return { success: false, error: error.message };
@@ -156,11 +111,21 @@ export const getUserParashaRequests = async (userId) => {
 
 export const updateParashaRequest = async (requestId, updates) => {
   try {
-    const requestRef = doc(db, 'parashaRequests', requestId);
-    await updateDoc(requestRef, {
-      ...updates,
-      updatedAt: serverTimestamp()
-    });
+    const dbUpdates = {};
+    if (updates.nombre) dbUpdates.full_name = updates.nombre;
+    if (updates.fechaNacimiento) dbUpdates.birth_date = updates.fechaNacimiento;
+    if (updates.parashaAsignada) dbUpdates.assigned_parasha = updates.parashaAsignada;
+    if (updates.status) dbUpdates.status = updates.status;
+
+    const { error } = await supabase
+      .from('parasha_requests')
+      .update({
+        ...dbUpdates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', requestId);
+
+    if (error) throw error;
     return { success: true };
   } catch (error) {
     console.error('Error updating parasha request:', error);
@@ -170,14 +135,17 @@ export const updateParashaRequest = async (requestId, updates) => {
 
 export const assignParashaToRequest = async (requestId, parashaData) => {
   try {
-    const requestRef = doc(db, 'parashaRequests', requestId);
-    await updateDoc(requestRef, {
-      status: 'completada',
-      parashaAsignada: parashaData,
-      processedAt: serverTimestamp(),
-      completedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
+    const { error } = await supabase
+      .from('parasha_requests')
+      .update({
+        status: 'completada',
+        assigned_parasha: parashaData,
+        processed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', requestId);
+
+    if (error) throw error;
     return { success: true };
   } catch (error) {
     console.error('Error assigning parasha:', error);
@@ -187,8 +155,12 @@ export const assignParashaToRequest = async (requestId, parashaData) => {
 
 export const deleteParashaRequest = async (requestId) => {
   try {
-    const requestRef = doc(db, 'parashaRequests', requestId);
-    await deleteDoc(requestRef);
+    const { error } = await supabase
+      .from('parasha_requests')
+      .delete()
+      .eq('id', requestId);
+
+    if (error) throw error;
     return { success: true };
   } catch (error) {
     console.error('Error deleting parasha request:', error);
@@ -202,54 +174,54 @@ export const calculateParashaFromDate = (birthDate, birthTime, birthPlace) => {
     // This is a simplified calculation - in reality this would be more complex
     const birth = new Date(birthDate);
     const currentYear = new Date().getFullYear();
-    
+
     // Calculate Barmitzva date (13 years after birth)
     const barmitzvaDate = new Date(birth);
     barmitzvaDate.setFullYear(birth.getFullYear() + 13);
-    
+
     // Sample Parashas - in reality this would be based on Hebrew calendar calculations
     const parashas = [
-      { 
-        name: 'Parashat Bereshit', 
-        hebrew: 'בְּרֵאשִׁית', 
+      {
+        name: 'Parashat Bereshit',
+        hebrew: 'בְּרֵאשִׁית',
         reference: 'Génesis 1:1-6:8',
         meaning: 'En el principio',
         themes: ['Creación', 'Responsabilidad', 'Nuevos comienzos']
       },
-      { 
-        name: 'Parashat Noach', 
-        hebrew: 'נֹחַ', 
+      {
+        name: 'Parashat Noach',
+        hebrew: 'נֹחַ',
         reference: 'Génesis 6:9-11:32',
         meaning: 'Descanso',
         themes: ['Renovación', 'Esperanza', 'Alianza']
       },
-      { 
-        name: 'Parashat Lech-Lecha', 
-        hebrew: 'לֶךְ-לְךָ', 
+      {
+        name: 'Parashat Lech-Lecha',
+        hebrew: 'לֶךְ-לְךָ',
         reference: 'Génesis 12:1-17:27',
         meaning: 'Vete por ti',
         themes: ['Viaje espiritual', 'Fe', 'Transformación']
       },
-      { 
-        name: 'Parashat Vayera', 
-        hebrew: 'וַיֵּרָא', 
+      {
+        name: 'Parashat Vayera',
+        hebrew: 'וַיֵּרָא',
         reference: 'Génesis 18:1-22:24',
         meaning: 'Y apareció',
         themes: ['Hospitalidad', 'Justicia', 'Pruebas de fe']
       },
-      { 
-        name: 'Parashat Chayei Sarah', 
-        hebrew: 'חַיֵּי שָׂרָה', 
+      {
+        name: 'Parashat Chayei Sarah',
+        hebrew: 'חַיֵּי שָׂרָה',
         reference: 'Génesis 23:1-25:18',
         meaning: 'Vida de Sara',
         themes: ['Legado', 'Continuidad', 'Elección']
       }
     ];
-    
+
     // Simple assignment based on birth month (for demo purposes)
     const monthIndex = birth.getMonth() % parashas.length;
     const selectedParasha = parashas[monthIndex];
-    
+
     return {
       success: true,
       parasha: selectedParasha,

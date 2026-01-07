@@ -7,13 +7,16 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:hostinger": "vite build && echo '\n✅ Build completado! Sube el contenido de la carpeta dist/ a Hostinger.'",
+    "preview:build": "vite build && vite preview"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",
     "@chakra-ui/react": "^2.8.2",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
+    "@supabase/supabase-js": "^2.89.0",
     "date-fns": "^4.1.0",
     "firebase": "^11.10.0",
     "framer-motion": "^11.0.5",

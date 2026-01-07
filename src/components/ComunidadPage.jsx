@@ -44,33 +44,25 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 // Servicio de foros
-import { 
-  getForumMessages, 
-  sendForumMessage, 
+import {
+  getForumMessages,
+  sendForumMessage,
   getLocalForumMessages,
-  checkFirebaseConnection 
+  checkDatabaseConnection,
+  getCommunityStats
 } from '../services/forumService';
-import { 
-  collection, 
-  query, 
-  onSnapshot, 
-  where,
-  orderBy,
-  limit
-} from 'firebase/firestore';
-import { db } from '../firebase/config';
 
 const ForumMessage = ({ message, currentUser }) => {
   const isOwnMessage = message.userId === currentUser?.uid;
-  
+
   return (
-    <Box 
+    <Box
       alignSelf={isOwnMessage ? 'flex-end' : 'flex-start'}
       maxW="70%"
       mb={3}
     >
-      <Card 
-        bg={isOwnMessage ? '#3B82F6' : 'white'} 
+      <Card
+        bg={isOwnMessage ? '#3B82F6' : 'white'}
         color={isOwnMessage ? 'white' : 'gray.800'}
         size="sm"
       >
@@ -83,7 +75,7 @@ const ForumMessage = ({ message, currentUser }) => {
               </Text>
               <Spacer />
               <Text fontSize="xs" opacity={0.6}>
-                {message.timestamp?.toDate ? 
+                {message.timestamp?.toDate ?
                   formatDistanceToNow(message.timestamp.toDate(), { addSuffix: true, locale: es }) :
                   'Ahora'
                 }
@@ -108,25 +100,25 @@ const ForumChat = ({ category, title, icon, description }) => {
   useEffect(() => {
     let cleanupFunction = null;
     let isMounted = true;
-    
+
     const initializeForum = async () => {
       try {
-        // Verificar conexión con Firebase
-        const connectionTest = await checkFirebaseConnection();
-        
+        // Verificar conexión (Supabase)
+        const connectionTest = await checkDatabaseConnection();
+
         if (!isMounted) return;
-        
+
         if (connectionTest.connected) {
-          // Usar Firebase
+          // Usar Supabase
           cleanupFunction = getForumMessages(category, (messagesData, error) => {
             if (!isMounted) return;
-            
+
             if (error) {
-              console.warn('Firebase error, falling back to localStorage:', error);
+              console.warn('Service error, falling back to localStorage:', error);
               setUseLocalStorage(true);
               const localMessages = getLocalForumMessages(category);
               setMessages(localMessages);
-              
+
               if (isMounted) {
                 toast({
                   title: "Modo sin conexión",
@@ -147,7 +139,7 @@ const ForumChat = ({ category, title, icon, description }) => {
           const localMessages = getLocalForumMessages(category);
           setMessages(localMessages);
           setLoading(false);
-          
+
           if (isMounted) {
             toast({
               title: "Modo sin conexión",
@@ -167,9 +159,9 @@ const ForumChat = ({ category, title, icon, description }) => {
         }
       }
     };
-    
+
     initializeForum();
-    
+
     return () => {
       isMounted = false;
       if (cleanupFunction) {
@@ -184,24 +176,24 @@ const ForumChat = ({ category, title, icon, description }) => {
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
-    
+
     try {
       const result = await sendForumMessage(
         category,
         newMessage,
-        userProfile?.uid || 'anonymous',
+        userProfile?.id || 'anonymous',
         userProfile?.name || 'Usuario Anónimo'
       );
-      
+
       if (result.success) {
         setNewMessage('');
-        
+
         // Si estamos usando localStorage, actualizar la lista manualmente
         if (useLocalStorage || result.isLocal) {
           const localMessages = getLocalForumMessages(category);
           setMessages(localMessages);
         }
-        
+
         toast({
           title: result.isLocal ? "Mensaje guardado localmente" : "Mensaje enviado",
           status: "success",
@@ -250,11 +242,11 @@ const ForumChat = ({ category, title, icon, description }) => {
         </Box>
 
         {/* Messages Area */}
-        <Box 
-          flex={1} 
-          p={4} 
-          overflowY="auto" 
-          display="flex" 
+        <Box
+          flex={1}
+          p={4}
+          overflowY="auto"
+          display="flex"
           flexDirection="column"
           minH={0}
         >
@@ -272,9 +264,9 @@ const ForumChat = ({ category, title, icon, description }) => {
           ) : (
             <VStack spacing={0} align="stretch">
               {messages.map((message) => (
-                <ForumMessage 
-                  key={message.id} 
-                  message={message} 
+                <ForumMessage
+                  key={message.id}
+                  message={message}
                   currentUser={userProfile}
                 />
               ))}
@@ -326,67 +318,23 @@ const ComunidadPage = () => {
     const getStats = async () => {
       try {
         setLoadingStats(true);
-        
-        // Listener para todos los mensajes
-        const messagesQuery = query(collection(db, 'forumMessages'));
-        const unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
-          const allMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          
-          // Contar mensajes por categoría
-          const generalCount = allMessages.filter(msg => msg.category === 'general').length;
-          const studentsCount = allMessages.filter(msg => msg.category === 'estudiantes').length;
-          const announcementsCount = allMessages.filter(msg => msg.category === 'anuncios').length;
-          
-          // Obtener usuarios únicos
-          const uniqueUsers = new Set(allMessages.map(msg => msg.userId)).size;
-          
-          // Actividad reciente (últimos 5 mensajes)
-          const recentMessages = allMessages
-            .sort((a, b) => {
-              const aTime = a.timestamp?.toDate?.() || new Date(a.createdAt);
-              const bTime = b.timestamp?.toDate?.() || new Date(b.createdAt);
-              return bTime - aTime;
-            })
-            .slice(0, 5);
-          
-          setCommunityStats({
-            totalMessages: allMessages.length,
-            totalUsers: uniqueUsers,
-            messagesGeneralCount: generalCount,
-            messagesStudentsCount: studentsCount,
-            messagesAnnouncementsCount: announcementsCount,
-            recentActivity: recentMessages
-          });
-          
-          setLoadingStats(false);
-        }, (error) => {
-          console.error('Error getting community stats:', error);
-          // Fallback con datos de localStorage
-          const localMessages = [
-            ...getLocalForumMessages('general'),
-            ...getLocalForumMessages('estudiantes'),
-            ...getLocalForumMessages('anuncios')
-          ];
-          
-          setCommunityStats({
-            totalMessages: localMessages.length,
-            totalUsers: new Set(localMessages.map(msg => msg.userId)).size,
-            messagesGeneralCount: getLocalForumMessages('general').length,
-            messagesStudentsCount: getLocalForumMessages('estudiantes').length,
-            messagesAnnouncementsCount: getLocalForumMessages('anuncios').length,
-            recentActivity: localMessages.slice(-5).reverse()
-          });
-          
-          setLoadingStats(false);
-        });
-        
-        return () => unsubscribeMessages();
+
+        const result = await getCommunityStats();
+
+        if (result.success) {
+          setCommunityStats(result.data);
+        } else {
+          console.warn('Failed to get stats, using blank/cache');
+        }
+
+        setLoadingStats(false);
+
       } catch (error) {
         console.error('Error setting up stats listener:', error);
         setLoadingStats(false);
       }
     };
-    
+
     getStats();
   }, []);
 
@@ -404,7 +352,7 @@ const ComunidadPage = () => {
   return (
     <Box w="100%" maxW="95vw" mx="auto" py={8} px={{ base: 4, md: 6, lg: 8 }}>
       <VStack spacing={8} align="stretch">
-        
+
         {/* Header */}
         <Box textAlign="center">
           <Heading size="xl" color="gray.800" mb={2}>
@@ -432,7 +380,7 @@ const ComunidadPage = () => {
               </HStack>
             </CardBody>
           </Card>
-          
+
           <Card>
             <CardBody>
               <HStack spacing={4}>
@@ -448,7 +396,7 @@ const ComunidadPage = () => {
               </HStack>
             </CardBody>
           </Card>
-          
+
           <Card>
             <CardBody>
               <HStack spacing={4}>
@@ -464,7 +412,7 @@ const ComunidadPage = () => {
               </HStack>
             </CardBody>
           </Card>
-          
+
           <Card>
             <CardBody>
               <HStack spacing={4}>
@@ -486,17 +434,17 @@ const ComunidadPage = () => {
         <Card bg="gradient-to-r from-blue-50 to-indigo-50" borderColor="#3B82F6" borderWidth={2}>
           <CardBody>
             <HStack spacing={4}>
-              <Avatar 
-                size="lg" 
-                name={userProfile?.name || 'Estudiante'} 
-                bg="#3B82F6" 
+              <Avatar
+                size="lg"
+                name={userProfile?.name || 'Estudiante'}
+                bg="#3B82F6"
               />
               <VStack align="start" spacing={1} flex={1}>
                 <Text fontSize="lg" fontWeight="bold" color="gray.800">
                   ¡Hola, {userProfile?.name || 'Estudiante'}!
                 </Text>
                 <Text color="gray.600">
-                  {communityStats.totalMessages > 0 
+                  {communityStats.totalMessages > 0
                     ? `Únete a ${communityStats.totalMessages} mensajes de ${communityStats.totalUsers} estudiantes activos`
                     : 'Sé el primero en participar en la comunidad'
                   }
@@ -523,22 +471,22 @@ const ComunidadPage = () => {
                         <VStack align="start" spacing={1} flex={1}>
                           <HStack spacing={2}>
                             <Text fontSize="sm" fontWeight="bold">{activity.userName}</Text>
-                            <Badge 
-                              size="sm" 
+                            <Badge
+                              size="sm"
                               colorScheme={
                                 activity.category === 'general' ? 'blue' :
-                                activity.category === 'estudiantes' ? 'green' : 'orange'
+                                  activity.category === 'estudiantes' ? 'green' : 'orange'
                               }
                             >
                               {activity.category === 'general' ? 'General' :
-                               activity.category === 'estudiantes' ? 'Estudiantes' : 'Anuncios'}
+                                activity.category === 'estudiantes' ? 'Estudiantes' : 'Anuncios'}
                             </Badge>
                           </HStack>
                           <Text fontSize="sm" color="gray.600" noOfLines={2}>
                             {activity.content}
                           </Text>
                           <Text fontSize="xs" color="gray.400">
-                            {activity.timestamp?.toDate ? 
+                            {activity.timestamp?.toDate ?
                               formatDistanceToNow(activity.timestamp.toDate(), { addSuffix: true, locale: es }) :
                               'Hace poco'
                             }
@@ -556,65 +504,69 @@ const ComunidadPage = () => {
         {/* Forums */}
         <Card>
           <CardBody>
-            <HStack justify="space-between" align="center" mb={4}>
+            <Flex direction={{ base: 'column', sm: 'row' }} justify="space-between" align={{ base: 'start', sm: 'center' }} mb={4} gap={3}>
               <Heading size="lg" color="gray.800">
                 💬 Foros de la Comunidad
               </Heading>
-              <HStack spacing={2}>
+              <HStack spacing={2} bg="gray.100" px={3} py={1} borderRadius="full">
                 <Box w={2} h={2} bg="green.400" borderRadius="full" />
-                <Text fontSize="sm" color="gray.600">
+                <Text fontSize="sm" color="gray.600" fontWeight="medium">
                   {communityStats.totalUsers} usuarios activos
                 </Text>
               </HStack>
-            </HStack>
-            
-            <Tabs variant="enclosed" colorScheme="blue">
-              <TabList>
-                <Tab _hover={{ bg: "blue.50", color: "blue.600" }}>
+            </Flex>
+
+            <Tabs variant="soft-rounded" colorScheme="blue" size="sm">
+              <TabList overflowX="auto" py={2} css={{
+                scrollbarWidth: 'none',
+                '::-webkit-scrollbar': { display: 'none' },
+                '-webkit-overflow-scrolling': 'touch'
+              }}>
+                <Tab minW="fit-content" mr={2} _selected={{ color: 'white', bg: 'blue.500' }}>
                   <Icon as={FaGlobeAmericas} mr={2} />
                   General ({communityStats.messagesGeneralCount})
                 </Tab>
-                <Tab _hover={{ bg: "blue.50", color: "blue.600" }}>
+                <Tab minW="fit-content" mr={2} _selected={{ color: 'white', bg: 'blue.500' }}>
                   <Icon as={FaGraduationCap} mr={2} />
                   Estudiantes ({communityStats.messagesStudentsCount})
                 </Tab>
-                <Tab _hover={{ bg: "blue.50", color: "blue.600" }}>
+                <Tab minW="fit-content" _selected={{ color: 'white', bg: 'blue.500' }}>
                   <Icon as={FaBullhorn} mr={2} />
                   Anuncios ({communityStats.messagesAnnouncementsCount})
                 </Tab>
               </TabList>
 
-          <TabPanels>
-            <TabPanel p={0} pt={6}>
-              <ForumChat
-                category="general"
-                title="Foro General"
-                icon={FaGlobeAmericas}
-                description="Conversaciones generales sobre la preparación del Barmitzva"
-              />
-            </TabPanel>
-            
-            <TabPanel p={0} pt={6}>
-              <ForumChat
-                category="estudiantes"
-                title="Foro de Estudiantes"
-                icon={FaGraduationCap}
-                description="Espacio para que los estudiantes compartan experiencias y se apoyen mutuamente"
-              />
-            </TabPanel>
-            
-            <TabPanel p={0} pt={6}>
-              <ForumChat
-                category="anuncios"
-                title="Anuncios"
-                icon={FaBullhorn}
-                description="Noticias importantes y actualizaciones del curso"
-              />
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </CardBody>
-    </Card>
+              <TabPanels>
+                <TabPanel p={0} pt={6}>
+                  <ForumChat
+                    category="general"
+                    title="Foro General"
+                    icon={FaGlobeAmericas}
+                    description="Conversaciones generales sobre la preparación del Barmitzva"
+                  />
+                </TabPanel>
+
+                <TabPanel p={0} pt={6}>
+                  <ForumChat
+                    category="estudiantes"
+                    title="Foro de Estudiantes"
+                    icon={FaGraduationCap}
+                    description="Espacio para que los estudiantes compartan experiencias y se apoyen mutuamente"
+                  />
+                </TabPanel>
+
+                <TabPanel p={0} pt={6}>
+                  <ForumChat
+                    category="anuncios"
+                    title="Anuncios"
+                    icon={FaBullhorn}
+                    description="Noticias importantes y actualizaciones del curso"
+                  />
+                </TabPanel>
+              </TabPanels>
+            </Tabs>
+          </CardBody>
+        </Card>
 
       </VStack>
     </Box>

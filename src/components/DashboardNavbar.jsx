@@ -20,6 +20,7 @@ import {
 import { HamburgerIcon } from '@chakra-ui/icons';
 import { FaHome, FaUsers, FaPlay, FaTools, FaSignOutAlt, FaChartBar, FaUser } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '../hooks/useUser';
 
 const NavLink = ({ to, children, icon, onClick, isActive = false }) => (
   <HStack
@@ -47,6 +48,7 @@ const NavLink = ({ to, children, icon, onClick, isActive = false }) => (
 const DashboardNavbar = ({ currentPage = 'inicio' }) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const navigate = useNavigate();
+  const { isAdmin } = useUser();
 
   const handleLogout = () => {
     // Simular logout y redirigir al home
@@ -59,7 +61,7 @@ const DashboardNavbar = ({ currentPage = 'inicio' }) => {
     { id: 'clases', label: 'Clases', icon: FaPlay, to: '/dashboard/clases' },
     { id: 'herramientas', label: 'Herramientas', icon: FaTools, to: '/dashboard/herramientas' },
     { id: 'perfil', label: 'Perfil', icon: FaUser, to: '/dashboard/perfil' },
-    { id: 'crm', label: 'CRM', icon: FaChartBar, to: '/dashboard/crm' },
+    ...(isAdmin ? [{ id: 'crm', label: 'CRM', icon: FaChartBar, to: '/dashboard/crm' }] : []),
   ];
 
   return (

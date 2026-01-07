@@ -1,91 +1,53 @@
-import { doc, getDoc, setDoc, updateDoc, collection, addDoc, query, orderBy, limit, getDocs, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { supabase } from '../supabase/client';
 
 // User Profile Operations
 export const createUserProfile = async (uid, userData) => {
   try {
-    const userRef = doc(db, 'users', uid);
-    const profileData = {
-      ...userData,
-      createdAt: serverTimestamp(),
-      lastActive: serverTimestamp(),
-      studyPlan: 'alef', // Default plan
-      preferences: {
-        language: 'es',
-        notifications: true,
-        timezone: 'America/Panama'
-      }
-    };
-    
-    await setDoc(userRef, profileData);
-    
-    // Create initial progress document with comprehensive KPIs
-    const progressRef = doc(db, 'progress', uid);
-    const initialProgress = {
-      userId: uid,
-      
-      // Core Learning Metrics
-      lessonsCompleted: 0,
-      totalLessons: 24,
-      studyHours: 0,
-      currentLevel: 'basico',
-      currentClass: 1,
-      lastWatchedClass: null,
-      
-      // Skill Progress (0-100%)
-      skillProgress: {
-        prayers: 0,      // Berajot y Tefilá
-        taamim: 0,       // Melodías de Torá
-        general: 0,      // Progreso general
-        hebrew: 0        // Lectura en hebreo
-      },
-      
-      // Engagement Metrics
-      totalStudyTime: 0,           // Total en minutos
-      averageSessionTime: 0,       // Promedio por sesión
-      totalSessions: 0,            // Número de sesiones de estudio
-      totalLogins: 0,              // Número de veces que ha entrado
-      
-      // Streak & Consistency
-      currentStreak: 0,            // Días consecutivos estudiando
-      longestStreak: 0,            // Racha más larga
-      streakDays: 0,               // Días de racha actual
-      lastStudyDate: null,         // Última vez que estudió
-      
-      // Goals & Progress
-      weeklyGoalMinutes: 60,       // Meta semanal en minutos
-      monthlyProgress: 0,          // Progreso del mes (0-100%)
-      weeklyProgress: 0,           // Progreso de la semana (0-100%)
-      
-      // Achievements & Milestones
-      achievements: [],            // Array de logros obtenidos
-      badges: [],                  // Insignias ganadas
-      milestones: [],             // Hitos alcanzados
-      
-      // Class Tracking
-      completedClasses: [],        // Array de números de clases completadas
-      classRatings: {},           // Ratings de clases {classId: rating}
-      favoriteClasses: [],        // Clases marcadas como favoritas
-      
-      // Activity Stats
-      lastActivityDate: serverTimestamp(),
-      firstLoginDate: serverTimestamp(),
-      profileCompletionDate: null,
-      barmitzvaStartDate: serverTimestamp(),
-      
-      // Performance Metrics
-      averageClassScore: 0,        // Promedio de calificaciones
-      timeToCompleteClass: 0,      // Tiempo promedio por clase
-      mostActiveTimeOfDay: null,   // Hora del día más activa
-      mostActiveDay: null,         // Día de la semana más activo
-      
-      // Timestamps
-      createdAt: serverTimestamp(),
-      lastUpdated: serverTimestamp()
-    };
-    
-    await setDoc(progressRef, initialProgress);
-    
+    // Check if profile exists (might be created by trigger)
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', uid)
+      .single();
+
+    if (!existingProfile) {
+      // Create profile if not exists
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: uid,
+          email: userData.email,
+          full_name: userData.name || userData.full_name,
+          study_plan: 'alef',
+          preferences: {
+            language: 'es',
+            notifications: true,
+            timezone: 'America/Panama'
+          }
+        });
+
+      if (profileError) throw profileError;
+
+      // Create initial stats
+      await supabase
+        .from('user_stats')
+        .insert({
+          user_id: uid,
+          total_lessons: 24,
+          current_level: 'basico',
+          current_class: 1
+        });
+    } else {
+      // Update existing
+      await supabase
+        .from('profiles')
+        .update({
+          full_name: userData.name || userData.full_name,
+          // associated data
+        })
+        .eq('id', uid);
+    }
+
     return { success: true };
   } catch (error) {
     console.error('Error creating user profile:', error);
@@ -95,14 +57,23 @@ export const createUserProfile = async (uid, userData) => {
 
 export const getUserProfile = async (uid) => {
   try {
-    const userRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userRef);
-    
-    if (userSnap.exists()) {
-      return { success: true, data: userSnap.data() };
-    } else {
-      return { success: false, error: 'User profile not found' };
-    }
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', uid)
+      .single();
+
+    if (error) throw error;
+
+    // Transform snake_case to camelCase for frontend compatibility
+    const formattedData = {
+      ...data,
+      name: data.full_name,
+      profileImage: data.avatar_url,
+      personalParasha: data.personal_parasha
+    };
+
+    return { success: true, data: formattedData };
   } catch (error) {
     console.error('Error getting user profile:', error);
     return { success: false, error: error.message };
@@ -111,11 +82,23 @@ export const getUserProfile = async (uid) => {
 
 export const updateUserProfile = async (uid, updates) => {
   try {
-    const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, {
-      ...updates,
-      lastModified: serverTimestamp()
-    });
+    // Map camelCase updates to snake_case db fields
+    const dbUpdates = {};
+    if (updates.name) dbUpdates.full_name = updates.name;
+    if (updates.profileImage) dbUpdates.avatar_url = updates.profileImage;
+    if (updates.personalParasha) dbUpdates.personal_parasha = updates.personalParasha;
+    if (updates.studyPlan) dbUpdates.study_plan = updates.studyPlan;
+    if (updates.preferences) dbUpdates.preferences = updates.preferences;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        ...dbUpdates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', uid);
+
+    if (error) throw error;
     return { success: true };
   } catch (error) {
     console.error('Error updating user profile:', error);
@@ -126,14 +109,38 @@ export const updateUserProfile = async (uid, updates) => {
 // Progress Operations
 export const getUserProgress = async (uid) => {
   try {
-    const progressRef = doc(db, 'progress', uid);
-    const progressSnap = await getDoc(progressRef);
-    
-    if (progressSnap.exists()) {
-      return { success: true, data: progressSnap.data() };
-    } else {
-      return { success: false, error: 'Progress not found' };
-    }
+    const { data, error } = await supabase
+      .from('user_stats')
+      .select('*')
+      .eq('user_id', uid)
+      .single();
+
+    if (error) throw error;
+
+    // Also fetch completed classes list
+    const { data: completions } = await supabase
+      .from('class_completions')
+      .select('class_number')
+      .eq('user_id', uid);
+
+    const completedClasses = completions ? completions.map(c => c.class_number) : [];
+
+    // Map to frontend format
+    const formattedData = {
+      lessonsCompleted: data.lessons_completed,
+      totalLessons: data.total_lessons,
+      studyHours: data.study_hours,
+      currentLevel: data.current_level,
+      currentClass: data.current_class,
+      lastWatchedClass: data.last_watched_class,
+      skillProgress: data.skill_progress,
+      completedClasses: completedClasses,
+      achievements: data.achievements || [],
+      // defaults
+      currentStreak: data.current_streak || 0
+    };
+
+    return { success: true, data: formattedData };
   } catch (error) {
     console.error('Error getting user progress:', error);
     return { success: false, error: error.message };
@@ -142,11 +149,22 @@ export const getUserProgress = async (uid) => {
 
 export const updateProgress = async (uid, progressData) => {
   try {
-    const progressRef = doc(db, 'progress', uid);
-    await updateDoc(progressRef, {
-      ...progressData,
-      lastUpdated: serverTimestamp()
-    });
+    const dbUpdates = {};
+    if (progressData.lessonsCompleted !== undefined) dbUpdates.lessons_completed = progressData.lessonsCompleted;
+    if (progressData.studyHours !== undefined) dbUpdates.study_hours = progressData.studyHours;
+    if (progressData.currentLevel !== undefined) dbUpdates.current_level = progressData.currentLevel;
+    if (progressData.currentClass !== undefined) dbUpdates.current_class = progressData.currentClass;
+    if (progressData.skillProgress !== undefined) dbUpdates.skill_progress = progressData.skillProgress;
+
+    const { error } = await supabase
+      .from('user_stats')
+      .update({
+        ...dbUpdates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', uid);
+
+    if (error) throw error;
     return { success: true };
   } catch (error) {
     console.error('Error updating progress:', error);
@@ -157,11 +175,15 @@ export const updateProgress = async (uid, progressData) => {
 // Track last watched class
 export const updateLastWatchedClass = async (uid, classNumber) => {
   try {
-    const progressRef = doc(db, 'progress', uid);
-    await updateDoc(progressRef, {
-      lastWatchedClass: parseInt(classNumber),
-      lastUpdated: serverTimestamp()
-    });
+    const { error } = await supabase
+      .from('user_stats')
+      .update({
+        last_watched_class: parseInt(classNumber),
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', uid);
+
+    if (error) throw error;
     return { success: true };
   } catch (error) {
     console.error('Error updating last watched class:', error);
@@ -172,42 +194,50 @@ export const updateLastWatchedClass = async (uid, classNumber) => {
 // Class Progress Operations
 export const markClassAsCompleted = async (uid, classId, classNumber, duration) => {
   try {
-    const progressRef = doc(db, 'progress', uid);
-    const progressSnap = await getDoc(progressRef);
-    
-    if (!progressSnap.exists()) {
-      return { success: false, error: 'User progress not found' };
-    }
-    
-    const currentProgress = progressSnap.data();
-    const completedClasses = currentProgress.completedClasses || [];
-    
-    // Check if class is already completed
-    if (completedClasses.includes(parseInt(classNumber))) {
-      return { success: true, message: 'Class already completed' };
-    }
-    
-    // Add to completed classes
-    const updatedCompletedClasses = [...completedClasses, parseInt(classNumber)];
-    const newLessonsCompleted = updatedCompletedClasses.length;
-    const addedStudyTime = parseInt(duration) || 0;
-    const newStudyHours = (currentProgress.studyHours || 0) + Math.round(addedStudyTime / 60 * 10) / 10;
-    
-    // Calculate updated skill progress
-    const updatedSkillProgress = calculateSkillProgress(updatedCompletedClasses, currentProgress.totalLessons || 24);
+    // 1. Insert into class_completions
+    const { error: completionError } = await supabase
+      .from('class_completions')
+      .upsert({
+        user_id: uid,
+        class_number: parseInt(classNumber),
+        completed_at: new Date().toISOString()
+      }, { onConflict: 'user_id, class_number' });
 
-    // Update progress including last watched class and skill progress
-    await updateDoc(progressRef, {
-      completedClasses: updatedCompletedClasses,
-      lessonsCompleted: newLessonsCompleted,
-      studyHours: newStudyHours,
-      lastWatchedClass: parseInt(classNumber),
-      lastStudyDate: serverTimestamp(),
-      skillProgress: updatedSkillProgress,
-      lastUpdated: serverTimestamp()
-    });
-    
-    // Log activity
+    if (completionError) throw completionError;
+
+    // 2. Fetch current stats to recalculate
+    const { data: currentStats } = await supabase
+      .from('user_stats')
+      .select('*')
+      .eq('user_id', uid)
+      .single();
+
+    const { data: allCompletions } = await supabase
+      .from('class_completions')
+      .select('class_number')
+      .eq('user_id', uid);
+
+    const completedClassNumbers = allCompletions.map(c => c.class_number);
+
+    // Calculate new stats
+    const addedStudyTime = parseInt(duration) || 0;
+    const newStudyHours = (Number(currentStats.study_hours) || 0) + Math.round(addedStudyTime / 60 * 10) / 10;
+    const updatedSkillProgress = calculateSkillProgress(completedClassNumbers, currentStats.total_lessons || 24);
+
+    // 3. Update user_stats
+    await supabase
+      .from('user_stats')
+      .update({
+        lessons_completed: completedClassNumbers.length,
+        study_hours: newStudyHours,
+        last_watched_class: parseInt(classNumber),
+        skill_progress: updatedSkillProgress,
+        last_study_date: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', uid);
+
+    // 4. Log activity
     await logActivity(uid, {
       type: 'lesson_completed',
       classId: classId,
@@ -215,7 +245,7 @@ export const markClassAsCompleted = async (uid, classId, classNumber, duration) 
       description: `Completó la Clase ${classNumber}`,
       studyTime: addedStudyTime
     });
-    
+
     return { success: true };
   } catch (error) {
     console.error('Error marking class as completed:', error);
@@ -226,39 +256,44 @@ export const markClassAsCompleted = async (uid, classId, classNumber, duration) 
 // Unmark class as completed
 export const unmarkClassAsCompleted = async (uid, classNumber) => {
   try {
-    const progressRef = doc(db, 'progress', uid);
-    const progressSnap = await getDoc(progressRef);
-    
-    if (!progressSnap.exists()) {
-      return { success: false, error: 'User progress not found' };
-    }
-    
-    const currentProgress = progressSnap.data();
-    const completedClasses = currentProgress.completedClasses || [];
-    
-    // Remove from completed classes
-    const updatedCompletedClasses = completedClasses.filter(num => num !== parseInt(classNumber));
-    const newLessonsCompleted = updatedCompletedClasses.length;
-    
-    // Calculate new current class (lowest uncompleted class)
-    const allClassNumbers = Array.from({length: 24}, (_, i) => i + 1);
-    const nextClass = allClassNumbers.find(num => !updatedCompletedClasses.includes(num)) || 1;
-    
-    // Update progress
-    await updateDoc(progressRef, {
-      completedClasses: updatedCompletedClasses,
-      lessonsCompleted: newLessonsCompleted,
-      currentClass: nextClass,
-      lastUpdated: serverTimestamp()
-    });
-    
-    // Log activity
+    // 1. Remove from class_completions
+    const { error: deleteError } = await supabase
+      .from('class_completions')
+      .delete()
+      .eq('user_id', uid)
+      .eq('class_number', parseInt(classNumber));
+
+    if (deleteError) throw deleteError;
+
+    // 2. Recalculate stats
+    const { data: allCompletions } = await supabase
+      .from('class_completions')
+      .select('class_number')
+      .eq('user_id', uid);
+
+    const completedClassNumbers = allCompletions.map(c => c.class_number);
+
+    // Determine next class (lowest uncompleted)
+    const allClassNumbers = Array.from({ length: 24 }, (_, i) => i + 1);
+    const nextClass = allClassNumbers.find(num => !completedClassNumbers.includes(num)) || 1;
+
+    // 3. Update stats
+    await supabase
+      .from('user_stats')
+      .update({
+        lessons_completed: completedClassNumbers.length,
+        current_class: nextClass,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', uid);
+
+    // 4. Log
     await logActivity(uid, {
       type: 'lesson_unmarked',
       classNumber: parseInt(classNumber),
       description: `Desmarcó como completada la Clase ${classNumber}`
     });
-    
+
     return { success: true };
   } catch (error) {
     console.error('Error unmarking class as completed:', error);
@@ -269,14 +304,17 @@ export const unmarkClassAsCompleted = async (uid, classNumber) => {
 // Activity Operations
 export const logActivity = async (uid, activityData) => {
   try {
-    const activitiesRef = collection(db, 'activities');
-    const activity = {
-      userId: uid,
-      ...activityData,
-      timestamp: serverTimestamp()
-    };
-    
-    await addDoc(activitiesRef, activity);
+    const { error } = await supabase
+      .from('activities')
+      .insert({
+        user_id: uid,
+        type: activityData.type,
+        description: activityData.description,
+        metadata: activityData, // store full object
+        created_at: new Date().toISOString()
+      });
+
+    if (error) throw error;
     return { success: true };
   } catch (error) {
     console.error('Error logging activity:', error);
@@ -286,23 +324,21 @@ export const logActivity = async (uid, activityData) => {
 
 export const getUserActivities = async (uid, limitCount = 10) => {
   try {
-    const activitiesRef = collection(db, 'activities');
-    const q = query(
-      activitiesRef, 
-      orderBy('timestamp', 'desc'), 
-      limit(limitCount)
-    );
-    
-    const querySnapshot = await getDocs(q);
-    const activities = [];
-    
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.userId === uid) {
-        activities.push({ id: doc.id, ...data });
-      }
-    });
-    
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false })
+      .limit(limitCount);
+
+    if (error) throw error;
+
+    const activities = data.map(act => ({
+      id: act.id,
+      ...act.metadata,
+      timestamp: { toDate: () => new Date(act.created_at) } // Mock Firebase timestamp
+    }));
+
     return { success: true, data: activities };
   } catch (error) {
     console.error('Error getting user activities:', error);
@@ -316,15 +352,15 @@ export const calculatePersonalParasha = (birthDate) => {
     const birth = new Date(birthDate);
     const currentYear = new Date().getFullYear();
     const thisYearBirthday = new Date(currentYear, birth.getMonth(), birth.getDate());
-    
+
     // If birthday hasn't passed this year, use this year, otherwise next year
-    const barmitzvaDate = thisYearBirthday < new Date() ? 
+    const barmitzvaDate = thisYearBirthday < new Date() ?
       new Date(currentYear + 1, birth.getMonth(), birth.getDate()) :
       thisYearBirthday;
-    
+
     // Add 13 years to birth date for Barmitzva
     barmitzvaDate.setFullYear(barmitzvaDate.getFullYear() + (13 - (currentYear - birth.getFullYear())));
-    
+
     // Simple parasha rotation (in reality this would be more complex)
     const parashas = [
       { name: 'Parashat Bereshit', hebrew: 'בְּרֵאשִׁית', reference: 'Génesis 1:1-6:8' },
@@ -338,10 +374,10 @@ export const calculatePersonalParasha = (birthDate) => {
       { name: 'Parashat Vayeshev', hebrew: 'וַיֵּשֶׁב', reference: 'Génesis 37:1-40:23' },
       { name: 'Parashat Miketz', hebrew: 'מִקֵּץ', reference: 'Génesis 41:1-44:17' }
     ];
-    
+
     const weekOfYear = Math.floor((barmitzvaDate - new Date(barmitzvaDate.getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000));
     const parashaIndex = weekOfYear % parashas.length;
-    
+
     return {
       parasha: parashas[parashaIndex],
       barmitzvaDate: barmitzvaDate,
@@ -370,7 +406,7 @@ export const calculateSkillProgress = (completedClasses = [], totalClasses = 24)
   // Classes 1-8: Prayers and Hebrew basics
   // Classes 9-16: Taamim (Torah melodies)
   // Classes 17-24: Advanced Hebrew and integration
-  
+
   const prayerClasses = completedClasses.filter(classNum => classNum >= 1 && classNum <= 8).length;
   const taamimClasses = completedClasses.filter(classNum => classNum >= 9 && classNum <= 16).length;
   const hebrewClasses = completedClasses.filter(classNum => classNum >= 17 && classNum <= 24).length;
@@ -396,15 +432,39 @@ export const updateUserProgressWithSkills = async (uid, userProgress) => {
       userProgress.totalLessons || 24
     );
 
-    const progressRef = doc(db, 'progress', uid);
-    await updateDoc(progressRef, {
-      skillProgress: calculatedSkillProgress,
-      lastUpdated: serverTimestamp()
-    });
+    const { error } = await supabase
+      .from('user_stats')
+      .update({
+        skill_progress: calculatedSkillProgress,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', uid);
+
+    if (error) throw error;
 
     return { success: true, skillProgress: calculatedSkillProgress };
   } catch (error) {
     console.error('Error updating skill progress:', error);
     return { success: false, error: error.message };
+  }
+};
+
+// Admin Check
+export const checkIsAdmin = async (uid) => {
+  try {
+    const { data, error } = await supabase
+      .from('administrators')
+      .select('user_id')
+      .eq('user_id', uid)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error checking admin status:', error);
+    }
+
+    return { success: true, isAdmin: !!data };
+  } catch (error) {
+    console.error('Error in checkIsAdmin:', error);
+    return { success: false, isAdmin: false };
   }
 };

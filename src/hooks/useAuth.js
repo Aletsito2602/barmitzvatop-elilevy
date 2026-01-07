@@ -1,33 +1,58 @@
 import { useState, useEffect } from 'react';
-import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { supabase } from '../supabase/client';
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const formatUser = (user) => {
+    if (!user) return null;
+    return { ...user, uid: user.id }; // Polyfill for Firebase compatibility
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    // Check active sessions and sets the user
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(formatUser(session?.user));
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(formatUser(session?.user));
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email, password) => {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      return { success: true, user: userCredential.user };
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      return { success: true, user: data.user };
     } catch (error) {
       return { success: false, error: error.message };
     }
   };
 
-  const register = async (email, password) => {
+  const register = async (email, password, fullName) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      return { success: true, user: userCredential.user };
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+
+      if (error) throw error;
+      return { success: true, user: data.user };
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -35,7 +60,8 @@ export const useAuth = () => {
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };

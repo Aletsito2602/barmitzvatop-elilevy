@@ -46,9 +46,9 @@ import {
 import { FaUsers, FaTrash, FaDownload, FaEye, FaCalendarAlt, FaClock, FaMapMarkerAlt, FaBuilding, FaUser, FaPlus, FaVideo, FaGraduationCap, FaBookOpen } from 'react-icons/fa';
 import { useState, useEffect } from 'react';
 import { createClass, getAllClasses, deleteClass, initializeSampleClasses } from '../services/classesService';
-import { testFirebaseConnection, initializeFirebaseCollections } from '../services/debugService';
+import { testDatabaseConnection, initializeDatabaseCollections } from '../services/debugService';
 import { useClasses } from '../hooks/useClasses';
-import { calculateParashaFromDate, assignParashaToRequest } from '../services/parashaService';
+import { calculateParashaFromDate, assignParashaToRequest, getAllParashaRequests, deleteParashaRequest } from '../services/parashaService';
 import { updateUserProfile } from '../services/userService';
 
 const CRMPage = () => {
@@ -73,53 +73,74 @@ const CRMPage = () => {
   });
   const toast = useToast();
 
-  // Cargar solicitudes desde localStorage
+  // Cargar solicitudes desde Supabase
+  const loadSolicitudes = async () => {
+    try {
+      const result = await getAllParashaRequests();
+      if (result.success) {
+        setSolicitudes(result.data);
+      } else {
+        toast({
+          title: "Error cargando solicitudes",
+          description: result.error,
+          status: "error",
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   useEffect(() => {
-    const solicitudesGuardadas = JSON.parse(localStorage.getItem('parashaRequests') || '[]');
-    setSolicitudes(solicitudesGuardadas);
+    loadSolicitudes();
   }, []);
 
   // Eliminar una solicitud específica
-  const eliminarSolicitud = (id) => {
-    const nuevasSolicitudes = solicitudes.filter(solicitud => solicitud.id !== id);
-    setSolicitudes(nuevasSolicitudes);
-    localStorage.setItem('parashaRequests', JSON.stringify(nuevasSolicitudes));
-    
-    toast({
-      title: "Solicitud eliminada",
-      description: "La solicitud ha sido eliminada correctamente",
-      status: "success",
-      duration: 3000,
-      isClosable: true,
-    });
+  const eliminarSolicitud = async (id) => {
+    if (window.confirm('¿Estás seguro de eliminar esta solicitud?')) {
+      const result = await deleteParashaRequest(id);
+      if (result.success) {
+        setSolicitudes(prev => prev.filter(s => s.id !== id));
+        toast({
+          title: "Solicitud eliminada",
+          status: "success",
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Error al eliminar",
+          description: result.error,
+          status: "error",
+          duration: 3000,
+        });
+      }
+    }
   };
 
-  // Limpiar todas las solicitudes
+  // Limpiar todas las solicitudes (deshabilitado en DB real por seguridad o implementar loop delete)
   const limpiarTodas = () => {
-    setSolicitudes([]);
-    localStorage.removeItem('parashaRequests');
-    
+    // Implementación pendiente o deshabilitada para evitar borrado masivo accidental en producción
     toast({
-      title: "Todas las solicitudes eliminadas",
-      description: "Se han eliminado todas las solicitudes del sistema",
+      title: "Función restringida",
+      description: "El borrado masivo está deshabilitado por seguridad en base de datos.",
       status: "info",
       duration: 3000,
-      isClosable: true,
     });
   };
 
   // Exportar datos (simulado)
   const exportarDatos = () => {
     const dataStr = JSON.stringify(solicitudes, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
     const exportFileDefaultName = `parasha-requests-${new Date().toISOString().split('T')[0]}.json`;
-    
+
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
-    
+
     toast({
       title: "Datos exportados",
       description: "Las solicitudes han sido descargadas como archivo JSON",
@@ -147,16 +168,15 @@ const CRMPage = () => {
     if (!parashaForm.name || !parashaForm.hebrew) {
       toast({
         title: "Campos requeridos",
-        description: "Por favor completa al menos el nombre y texto hebreo de la Parashá",
+        description: "Completa nombre y texto hebreo",
         status: "warning",
         duration: 3000,
-        isClosable: true,
       });
       return;
     }
 
     setIsAssigningParasha(true);
-    
+
     try {
       const parashaData = {
         name: parashaForm.name,
@@ -164,52 +184,38 @@ const CRMPage = () => {
         reference: parashaForm.reference || 'Manual',
         meaning: parashaForm.meaning || 'Asignación manual'
       };
-      
-      // Actualizar la solicitud con la Parashá asignada
-      const updatedSolicitud = {
-        ...selectedSolicitud,
-        parashaAsignada: parashaData,
-        status: 'completada',
-        processedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString()
-      };
-      
-      // Actualizar en localStorage
-      const allRequests = JSON.parse(localStorage.getItem('parashaRequests') || '[]');
-      const updatedRequests = allRequests.map(req => 
-        req.id === selectedSolicitud.id ? updatedSolicitud : req
-      );
-      localStorage.setItem('parashaRequests', JSON.stringify(updatedRequests));
-      
-      // Actualizar el perfil del usuario con la Parashá
-      const updateResult = await updateUserProfile(selectedSolicitud.userId, {
-        personalParasha: parashaData,
-        parashaAssignedAt: new Date().toISOString()
-      });
-      
-      if (updateResult.success) {
-        toast({
-          title: "¡Parashá asignada exitosamente!",
-          description: `Se ha asignado ${parashaData.name} a ${selectedSolicitud.nombre}`,
-          status: "success",
-          duration: 5000,
-          isClosable: true,
+
+      // 1. Actualizar la solicitud en DB
+      const assignResult = await assignParashaToRequest(selectedSolicitud.id, parashaData);
+
+      if (!assignResult.success) throw new Error(assignResult.error);
+
+      // 2. Actualizar el perfil del usuario con la Parashá (para que la vea en Dashboard)
+      if (selectedSolicitud.userId) {
+        await updateUserProfile(selectedSolicitud.userId, {
+          personalParasha: parashaData,
+          parashaAssignedAt: new Date().toISOString()
         });
-        
-        // Actualizar la lista local de solicitudes
-        setSolicitudes(updatedRequests);
-        onAssignClose();
-      } else {
-        throw new Error("Error al actualizar el perfil del usuario");
       }
+
+      toast({
+        title: "¡Parashá asignada!",
+        description: `Se ha asignado ${parashaData.name} a ${selectedSolicitud.nombre}`,
+        status: "success",
+        duration: 5000,
+      });
+
+      // Recargar lista
+      loadSolicitudes();
+      onAssignClose();
+
     } catch (error) {
       console.error('Error assigning parasha:', error);
       toast({
-        title: "Error al asignar Parashá",
-        description: "Ocurrió un error al asignar la Parashá. Por favor intenta nuevamente.",
+        title: "Error al asignar",
+        description: error.message || "Error desconocido",
         status: "error",
         duration: 5000,
-        isClosable: true,
       });
     } finally {
       setIsAssigningParasha(false);
@@ -219,7 +225,7 @@ const CRMPage = () => {
   return (
     <Box w="100%" maxW="95vw" mx="auto" py={8} px={{ base: 4, md: 6, lg: 8 }}>
       <VStack spacing={8} align="stretch">
-        
+
         {/* Header */}
         <Flex align="center" justify="space-between" flexWrap="wrap" gap={4}>
           <Box>
@@ -230,7 +236,7 @@ const CRMPage = () => {
               Gestión de solicitudes y clases del curso
             </Text>
           </Box>
-          
+
           <HStack spacing={3}>
             <Badge colorScheme="blue" fontSize="md" px={3} py={1}>
               {solicitudes.length} solicitudes
@@ -279,183 +285,181 @@ const CRMPage = () => {
               <VStack spacing={6} align="stretch">
                 {/* Estadísticas */}
                 <SimpleGrid columns={{ base: 1, md: 4 }} spacing={6}>
-          <Card>
-            <CardBody>
-              <HStack>
-                <Icon as={FaUsers} color="#F59E0B" boxSize={8} />
-                <VStack align="start" spacing={0}>
-                  <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-                    {solicitudes.length}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">Total Solicitudes</Text>
-                </VStack>
-              </HStack>
-            </CardBody>
-          </Card>
-          
-          <Card>
-            <CardBody>
-              <HStack>
-                <Icon as={FaCalendarAlt} color="#10B981" boxSize={8} />
-                <VStack align="start" spacing={0}>
-                  <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-                    {solicitudes.filter(s => new Date(s.fechaCreacion).toDateString() === new Date().toDateString()).length}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">Hoy</Text>
-                </VStack>
-              </HStack>
-            </CardBody>
-          </Card>
-          
-          <Card>
-            <CardBody>
-              <HStack>
-                <Icon as={FaClock} color="#8B5CF6" boxSize={8} />
-                <VStack align="start" spacing={0}>
-                  <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-                    {solicitudes.filter(s => {
-                      const fechaSolicitud = new Date(s.fechaCreacion);
-                      const hace7Dias = new Date();
-                      hace7Dias.setDate(hace7Dias.getDate() - 7);
-                      return fechaSolicitud >= hace7Dias;
-                    }).length}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">Últimos 7 días</Text>
-                </VStack>
-              </HStack>
-            </CardBody>
-          </Card>
-          
-          <Card>
-            <CardBody>
-              <HStack>
-                <Icon as={FaEye} color="#EF4444" boxSize={8} />
-                <VStack align="start" spacing={0}>
-                  <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-                    {solicitudes.length > 0 ? solicitudes.reduce((total, s) => total + s.nombre.length, 0) / solicitudes.length : 0}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">Promedio caracteres</Text>
-                </VStack>
-              </HStack>
-            </CardBody>
-          </Card>
-        </SimpleGrid>
-
-        {/* Contenido principal */}
-        {solicitudes.length === 0 ? (
-          <Card>
-            <CardBody>
-              <VStack spacing={4} py={12}>
-                <Icon as={FaUsers} color="gray.300" boxSize={16} />
-                <Heading size="md" color="gray.500">No hay solicitudes aún</Heading>
-                <Text color="gray.400" textAlign="center">
-                  Las solicitudes de parashá aparecerán aquí cuando los usuarios completen el formulario
-                </Text>
-                <Alert status="info" borderRadius="md" maxW="md">
-                  <AlertIcon />
-                  <Text fontSize="sm">
-                    Ve a la sección "Herramientas" para probar el formulario
-                  </Text>
-                </Alert>
-              </VStack>
-            </CardBody>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <Heading size="md">Solicitudes registradas</Heading>
-            </CardHeader>
-            <CardBody>
-              <TableContainer>
-                <Table variant="simple" size="sm">
-                  <Thead>
-                    <Tr>
-                      <Th>Nombre</Th>
-                      <Th>Fecha Nacimiento</Th>
-                      <Th>Hora</Th>
-                      <Th>Lugar Nacimiento</Th>
-                      <Th>Ubicación Barmitzva</Th>
-                      <Th>Fecha Solicitud</Th>
-                      <Th>Acciones</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {solicitudes.map((solicitud) => (
-                      <Tr key={solicitud.id}>
-                        <Td>
-                          <HStack>
-                            <Icon as={FaUser} color="#F59E0B" boxSize={4} />
-                            <Text fontWeight="medium">{solicitud.nombre}</Text>
-                          </HStack>
-                        </Td>
-                        <Td>
-                          <HStack>
-                            <Icon as={FaCalendarAlt} color="#10B981" boxSize={4} />
-                            <Text>{new Date(solicitud.fechaNacimiento).toLocaleDateString('es-ES')}</Text>
-                          </HStack>
-                        </Td>
-                        <Td>
-                          <HStack>
-                            <Icon as={FaClock} color="#8B5CF6" boxSize={4} />
-                            <Text>{solicitud.horaNacimiento}</Text>
-                          </HStack>
-                        </Td>
-                        <Td>
-                          <HStack>
-                            <Icon as={FaMapMarkerAlt} color="#EF4444" boxSize={4} />
-                            <Text>{solicitud.lugarNacimiento}</Text>
-                          </HStack>
-                        </Td>
-                        <Td>
-                          <HStack>
-                            <Icon as={FaBuilding} color="#06B6D4" boxSize={4} />
-                            <Text>{solicitud.ubicacionBarmitzva}</Text>
-                          </HStack>
-                        </Td>
-                        <Td>
-                          <Text fontSize="sm" color="gray.600">
-                            {solicitud.fechaCreacionFormatted}
+                  <Card>
+                    <CardBody>
+                      <HStack>
+                        <Icon as={FaUsers} color="#F59E0B" boxSize={8} />
+                        <VStack align="start" spacing={0}>
+                          <Text fontSize="2xl" fontWeight="bold" color="gray.800">
+                            {solicitudes.length}
                           </Text>
-                        </Td>
-                        <Td>
-                          <HStack spacing={2}>
-                            <Button
-                              size="xs"
-                              colorScheme="blue"
-                              variant="ghost"
-                              onClick={() => verDetalles(solicitud)}
-                              title="Ver detalles"
-                            >
-                              <Icon as={FaEye} />
-                            </Button>
-                            <Button
-                              size="xs"
-                              colorScheme="green"
-                              variant="ghost"
-                              onClick={() => abrirModalAsignar(solicitud)}
-                              title="Asignar Parashá"
-                            >
-                              <Icon as={FaBookOpen} />
-                            </Button>
-                            <Button
-                              size="xs"
-                              colorScheme="red"
-                              variant="ghost"
-                              onClick={() => eliminarSolicitud(solicitud.id)}
-                              title="Eliminar"
-                            >
-                              <Icon as={FaTrash} />
-                            </Button>
-                          </HStack>
-                        </Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              </TableContainer>
-            </CardBody>
-          </Card>
-        )}
+                          <Text fontSize="sm" color="gray.600">Total Solicitudes</Text>
+                        </VStack>
+                      </HStack>
+                    </CardBody>
+                  </Card>
+
+                  <Card>
+                    <CardBody>
+                      <HStack>
+                        <Icon as={FaCalendarAlt} color="#10B981" boxSize={8} />
+                        <VStack align="start" spacing={0}>
+                          <Text fontSize="2xl" fontWeight="bold" color="gray.800">
+                            {solicitudes.filter(s => new Date(s.fechaCreacion).toDateString() === new Date().toDateString()).length}
+                          </Text>
+                          <Text fontSize="sm" color="gray.600">Hoy</Text>
+                        </VStack>
+                      </HStack>
+                    </CardBody>
+                  </Card>
+
+                  <Card>
+                    <CardBody>
+                      <HStack>
+                        <Icon as={FaClock} color="#8B5CF6" boxSize={8} />
+                        <VStack align="start" spacing={0}>
+                          <Text fontSize="2xl" fontWeight="bold" color="gray.800">
+                            {solicitudes.filter(s => {
+                              const fechaSolicitud = new Date(s.fechaCreacion);
+                              const hace7Dias = new Date();
+                              hace7Dias.setDate(hace7Dias.getDate() - 7);
+                              return fechaSolicitud >= hace7Dias;
+                            }).length}
+                          </Text>
+                          <Text fontSize="sm" color="gray.600">Últimos 7 días</Text>
+                        </VStack>
+                      </HStack>
+                    </CardBody>
+                  </Card>
+
+                  <Card>
+                    <CardBody>
+                      <HStack>
+                        <Icon as={FaEye} color="#EF4444" boxSize={8} />
+                        <VStack align="start" spacing={0}>
+                          <Text fontSize="2xl" fontWeight="bold" color="gray.800">
+                            {solicitudes.length > 0 ? solicitudes.reduce((total, s) => total + s.nombre.length, 0) / solicitudes.length : 0}
+                          </Text>
+                          <Text fontSize="sm" color="gray.600">Promedio caracteres</Text>
+                        </VStack>
+                      </HStack>
+                    </CardBody>
+                  </Card>
+                </SimpleGrid>
+
+                {/* Contenido principal */}
+                {solicitudes.length === 0 ? (
+                  <Card>
+                    <CardBody>
+                      <VStack spacing={4} py={12}>
+                        <Icon as={FaUsers} color="gray.300" boxSize={16} />
+                        <Heading size="md" color="gray.500">No hay solicitudes aún</Heading>
+                        <Text color="gray.400" textAlign="center">
+                          Las solicitudes de parashá aparecerán aquí cuando los usuarios completen el formulario
+                        </Text>
+                        <Alert status="info" borderRadius="md" maxW="md">
+                          <AlertIcon />
+                          <Text fontSize="sm">
+                            Ve a la sección "Herramientas" para probar el formulario
+                          </Text>
+                        </Alert>
+                      </VStack>
+                    </CardBody>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardHeader>
+                      <Heading size="md">Solicitudes registradas</Heading>
+                    </CardHeader>
+                    <CardBody>
+                      <TableContainer>
+                        <Table variant="simple" size="sm">
+                          <Thead>
+                            <Tr>
+                              <Th>Nombre</Th>
+                              <Th>Fecha Nacimiento</Th>
+                              <Th>Hora</Th>
+                              <Th>Lugar Nacimiento</Th>
+                              <Th>Ubicación Barmitzva</Th>
+                              <Th>Fecha Solicitud</Th>
+                              <Th>Acciones</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {solicitudes.map((solicitud) => (
+                              <Tr key={solicitud.id}>
+                                <Td>
+                                  <HStack>
+                                    <Icon as={FaUser} color="#F59E0B" boxSize={4} />
+                                    <Text fontWeight="medium">{solicitud.nombre}</Text>
+                                  </HStack>
+                                </Td>
+                                <Td>
+                                  <HStack>
+                                    <Icon as={FaCalendarAlt} color="#10B981" boxSize={4} />
+                                    <Text>{new Date(solicitud.fechaNacimiento).toLocaleDateString('es-ES')}</Text>
+                                  </HStack>
+                                </Td>
+                                <Td>
+                                  <HStack>
+                                    <Icon as={FaClock} color="#8B5CF6" boxSize={4} />
+                                    <Text>{solicitud.horaNacimiento}</Text>
+                                  </HStack>
+                                </Td>
+                                <Td>
+                                  <HStack>
+                                    <Icon as={FaMapMarkerAlt} color="#EF4444" boxSize={4} />
+                                    <Text>{solicitud.lugarNacimiento}</Text>
+                                  </HStack>
+                                </Td>
+                                <Td>
+                                  <HStack>
+                                    <Icon as={FaBuilding} color="#06B6D4" boxSize={4} />
+                                    <Text>{solicitud.ubicacionBarmitzva}</Text>
+                                  </HStack>
+                                </Td>
+                                <Td>
+                                  {solicitud.createdAt && new Date(solicitud.createdAt).toLocaleDateString('es-ES')}
+                                </Td>
+                                <Td>
+                                  <HStack spacing={2}>
+                                    <Button
+                                      size="xs"
+                                      colorScheme="blue"
+                                      variant="ghost"
+                                      onClick={() => verDetalles(solicitud)}
+                                      title="Ver detalles"
+                                    >
+                                      <Icon as={FaEye} />
+                                    </Button>
+                                    <Button
+                                      size="xs"
+                                      colorScheme="green"
+                                      variant="ghost"
+                                      onClick={() => abrirModalAsignar(solicitud)}
+                                      title="Asignar Parashá"
+                                    >
+                                      <Icon as={FaBookOpen} />
+                                    </Button>
+                                    <Button
+                                      size="xs"
+                                      colorScheme="red"
+                                      variant="ghost"
+                                      onClick={() => eliminarSolicitud(solicitud.id)}
+                                      title="Eliminar"
+                                    >
+                                      <Icon as={FaTrash} />
+                                    </Button>
+                                  </HStack>
+                                </Td>
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      </TableContainer>
+                    </CardBody>
+                  </Card>
+                )}
               </VStack>
             </TabPanel>
 
@@ -478,7 +482,7 @@ const CRMPage = () => {
                       variant="outline"
                       size="sm"
                       onClick={async () => {
-                        const result = await testFirebaseConnection();
+                        const result = await testDatabaseConnection();
                         toast({
                           title: result.success ? 'Conexión exitosa' : 'Error de conexión',
                           description: result.success ? result.message : result.error,
@@ -487,9 +491,9 @@ const CRMPage = () => {
                         });
                       }}
                     >
-                      🔧 Test Firebase
+                      🔧 Test Supabase
                     </Button>
-                    
+
                     {classes.length === 0 && (
                       <>
                         <Button
@@ -497,7 +501,7 @@ const CRMPage = () => {
                           variant="outline"
                           size="sm"
                           onClick={async () => {
-                            const result = await initializeFirebaseCollections();
+                            const result = await initializeDatabaseCollections();
                             if (result.success) {
                               refreshClasses();
                               toast({
@@ -564,7 +568,7 @@ const CRMPage = () => {
                       </HStack>
                     </CardBody>
                   </Card>
-                  
+
                   <Card>
                     <CardBody>
                       <HStack>
@@ -578,7 +582,7 @@ const CRMPage = () => {
                       </HStack>
                     </CardBody>
                   </Card>
-                  
+
                   <Card>
                     <CardBody>
                       <HStack>
@@ -654,26 +658,26 @@ const CRMPage = () => {
                                     <Badge
                                       size="sm"
                                       colorScheme={
-                                        (clase.difficulty === 'beginner' || clase.difficulty === 'basico') ? 'green' : 
-                                        (clase.difficulty === 'intermediate' || clase.difficulty === 'intermedio') ? 'yellow' : 'red'
+                                        (clase.difficulty === 'beginner' || clase.difficulty === 'basico') ? 'green' :
+                                          (clase.difficulty === 'intermediate' || clase.difficulty === 'intermedio') ? 'yellow' : 'red'
                                       }
                                     >
                                       {clase.difficulty === 'beginner' ? 'Básico' :
-                                       clase.difficulty === 'intermediate' ? 'Intermedio' :
-                                       clase.difficulty === 'advanced' ? 'Avanzado' :
-                                       clase.difficulty === 'basico' ? 'Básico' :
-                                       clase.difficulty === 'intermedio' ? 'Intermedio' :
-                                       clase.difficulty === 'avanzado' ? 'Avanzado' : 'Básico'}
+                                        clase.difficulty === 'intermediate' ? 'Intermedio' :
+                                          clase.difficulty === 'advanced' ? 'Avanzado' :
+                                            clase.difficulty === 'basico' ? 'Básico' :
+                                              clase.difficulty === 'intermedio' ? 'Intermedio' :
+                                                clase.difficulty === 'avanzado' ? 'Avanzado' : 'Básico'}
                                     </Badge>
                                     {clase.youtubeLink && (
                                       <HStack spacing={1}>
                                         <Icon as={FaVideo} color={
                                           clase.videoType === 'youtube' ? 'red.500' :
-                                          clase.videoType === 'vimeo' ? 'blue.500' : 'green.500'
+                                            clase.videoType === 'vimeo' ? 'blue.500' : 'green.500'
                                         } boxSize={3} />
                                         <Text fontSize="xs" color="gray.500">
                                           {clase.videoType === 'youtube' ? 'YouTube' :
-                                           clase.videoType === 'vimeo' ? 'Vimeo' : 'Personalizado'}
+                                            clase.videoType === 'vimeo' ? 'Vimeo' : 'Personalizado'}
                                         </Text>
                                       </HStack>
                                     )}
@@ -724,7 +728,7 @@ const CRMPage = () => {
                 <FormLabel>Título de la Clase</FormLabel>
                 <Input
                   value={classForm.title}
-                  onChange={(e) => setClassForm({...classForm, title: e.target.value})}
+                  onChange={(e) => setClassForm({ ...classForm, title: e.target.value })}
                   placeholder="Ej: Introducción a los Taamim"
                 />
               </FormControl>
@@ -734,7 +738,7 @@ const CRMPage = () => {
                 <Input
                   type="number"
                   value={classForm.classNumber}
-                  onChange={(e) => setClassForm({...classForm, classNumber: e.target.value})}
+                  onChange={(e) => setClassForm({ ...classForm, classNumber: e.target.value })}
                   placeholder="Ej: 1"
                 />
               </FormControl>
@@ -743,7 +747,7 @@ const CRMPage = () => {
                 <FormLabel>Tipo de Video</FormLabel>
                 <Select
                   value={classForm.videoType || 'youtube'}
-                  onChange={(e) => setClassForm({...classForm, videoType: e.target.value})}
+                  onChange={(e) => setClassForm({ ...classForm, videoType: e.target.value })}
                   mb={3}
                 >
                   <option value="youtube">YouTube</option>
@@ -754,17 +758,17 @@ const CRMPage = () => {
 
               <FormControl isRequired>
                 <FormLabel>
-                  {classForm.videoType === 'youtube' ? 'Link de YouTube' : 
-                   classForm.videoType === 'vimeo' ? 'Link de Vimeo' : 
-                   'Link de Video Personalizado'}
+                  {classForm.videoType === 'youtube' ? 'Link de YouTube' :
+                    classForm.videoType === 'vimeo' ? 'Link de Vimeo' :
+                      'Link de Video Personalizado'}
                 </FormLabel>
                 <Input
                   value={classForm.youtubeLink}
-                  onChange={(e) => setClassForm({...classForm, youtubeLink: e.target.value})}
+                  onChange={(e) => setClassForm({ ...classForm, youtubeLink: e.target.value })}
                   placeholder={
                     classForm.videoType === 'youtube' ? 'https://www.youtube.com/watch?v=...' :
-                    classForm.videoType === 'vimeo' ? 'https://vimeo.com/...' :
-                    'https://ejemplo.com/video.mp4'
+                      classForm.videoType === 'vimeo' ? 'https://vimeo.com/...' :
+                        'https://ejemplo.com/video.mp4'
                   }
                 />
               </FormControl>
@@ -773,7 +777,7 @@ const CRMPage = () => {
                 <FormLabel>Descripción</FormLabel>
                 <Textarea
                   value={classForm.description}
-                  onChange={(e) => setClassForm({...classForm, description: e.target.value})}
+                  onChange={(e) => setClassForm({ ...classForm, description: e.target.value })}
                   placeholder="Descripción de la clase..."
                   rows={3}
                 />
@@ -785,7 +789,7 @@ const CRMPage = () => {
                   <Input
                     type="number"
                     value={classForm.duration}
-                    onChange={(e) => setClassForm({...classForm, duration: e.target.value})}
+                    onChange={(e) => setClassForm({ ...classForm, duration: e.target.value })}
                     placeholder="30"
                   />
                 </FormControl>
@@ -794,7 +798,7 @@ const CRMPage = () => {
                   <FormLabel>Dificultad</FormLabel>
                   <Select
                     value={classForm.difficulty}
-                    onChange={(e) => setClassForm({...classForm, difficulty: e.target.value})}
+                    onChange={(e) => setClassForm({ ...classForm, difficulty: e.target.value })}
                   >
                     <option value="basico">Básico</option>
                     <option value="intermedio">Intermedio</option>
@@ -807,7 +811,7 @@ const CRMPage = () => {
                 <FormLabel>Categoría</FormLabel>
                 <Select
                   value={classForm.category}
-                  onChange={(e) => setClassForm({...classForm, category: e.target.value})}
+                  onChange={(e) => setClassForm({ ...classForm, category: e.target.value })}
                 >
                   <option value="alef">Alef</option>
                   <option value="bet">Bet</option>
@@ -838,7 +842,7 @@ const CRMPage = () => {
 
                 setIsCreatingClass(true);
                 const result = await createClass(classForm);
-                
+
                 if (result.success) {
                   toast({
                     title: 'Clase creada',
@@ -846,7 +850,7 @@ const CRMPage = () => {
                     status: 'success',
                     duration: 3000,
                   });
-                  
+
                   // Reset form
                   setClassForm({
                     title: '',
@@ -858,7 +862,7 @@ const CRMPage = () => {
                     difficulty: 'basico',
                     category: 'alef'
                   });
-                  
+
                   refreshClasses();
                   onClose();
                 } else {
@@ -869,7 +873,7 @@ const CRMPage = () => {
                     duration: 3000,
                   });
                 }
-                
+
                 setIsCreatingClass(false);
               }}
             >
@@ -900,19 +904,19 @@ const CRMPage = () => {
                   </Box>
                   <Box>
                     <Text fontWeight="bold" color="gray.600" fontSize="sm">Estado</Text>
-                    <Badge 
+                    <Badge
                       colorScheme={
                         selectedSolicitud.status === 'completada' ? 'green' :
-                        selectedSolicitud.status === 'procesando' ? 'blue' :
-                        selectedSolicitud.status === 'pendiente' ? 'yellow' : 'red'
+                          selectedSolicitud.status === 'procesando' ? 'blue' :
+                            selectedSolicitud.status === 'pendiente' ? 'yellow' : 'red'
                       }
                       fontSize="sm"
                       px={3}
                       py={1}
                     >
                       {selectedSolicitud.status === 'completada' ? 'Completada' :
-                       selectedSolicitud.status === 'procesando' ? 'Procesando' :
-                       selectedSolicitud.status === 'pendiente' ? 'Pendiente' : 'Rechazada'}
+                        selectedSolicitud.status === 'procesando' ? 'Procesando' :
+                          selectedSolicitud.status === 'pendiente' ? 'Pendiente' : 'Rechazada'}
                     </Badge>
                   </Box>
                 </SimpleGrid>
@@ -1041,7 +1045,7 @@ const CRMPage = () => {
                 <FormLabel>Nombre de la Parashá</FormLabel>
                 <Input
                   value={parashaForm.name}
-                  onChange={(e) => setParashaForm({...parashaForm, name: e.target.value})}
+                  onChange={(e) => setParashaForm({ ...parashaForm, name: e.target.value })}
                   placeholder="Ej: Bereshit"
                 />
               </FormControl>
@@ -1050,7 +1054,7 @@ const CRMPage = () => {
                 <FormLabel>Texto en Hebreo</FormLabel>
                 <Input
                   value={parashaForm.hebrew}
-                  onChange={(e) => setParashaForm({...parashaForm, hebrew: e.target.value})}
+                  onChange={(e) => setParashaForm({ ...parashaForm, hebrew: e.target.value })}
                   placeholder="Ej: בראשית"
                   dir="rtl"
                 />
@@ -1060,7 +1064,7 @@ const CRMPage = () => {
                 <FormLabel>Referencia</FormLabel>
                 <Input
                   value={parashaForm.reference}
-                  onChange={(e) => setParashaForm({...parashaForm, reference: e.target.value})}
+                  onChange={(e) => setParashaForm({ ...parashaForm, reference: e.target.value })}
                   placeholder="Ej: Génesis 1:1-6:8"
                 />
               </FormControl>
@@ -1069,7 +1073,7 @@ const CRMPage = () => {
                 <FormLabel>Significado</FormLabel>
                 <Textarea
                   value={parashaForm.meaning}
-                  onChange={(e) => setParashaForm({...parashaForm, meaning: e.target.value})}
+                  onChange={(e) => setParashaForm({ ...parashaForm, meaning: e.target.value })}
                   placeholder="Descripción del significado de la Parashá"
                   rows={3}
                 />
