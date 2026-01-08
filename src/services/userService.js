@@ -458,13 +458,19 @@ export const checkIsAdmin = async (uid) => {
       .eq('user_id', uid)
       .single();
 
-    if (error && error.code !== 'PGRST116') {
+    // Handle table not existing (406) or no rows found (PGRST116)
+    if (error) {
+      // 406 = table doesn't exist, PGRST116 = no rows found
+      if (error.code === 'PGRST116' || error.message?.includes('406') || error.code === '42P01') {
+        return { success: true, isAdmin: false };
+      }
       console.error('Error checking admin status:', error);
+      return { success: true, isAdmin: false };
     }
 
     return { success: true, isAdmin: !!data };
   } catch (error) {
-    console.error('Error in checkIsAdmin:', error);
-    return { success: false, isAdmin: false };
+    // Silently fail - administrators table might not exist
+    return { success: true, isAdmin: false };
   }
 };

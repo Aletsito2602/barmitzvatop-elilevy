@@ -131,6 +131,13 @@ create table public.chat_messages (
 );
 
 
+-- ADMINISTRATORS (Admin users for CRM access)
+create table public.administrators (
+  user_id uuid references public.profiles(id) on delete cascade primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+
 -- ROW LEVEL SECURITY (RLS) POLICIES
 
 -- Profiles
@@ -141,6 +148,9 @@ create policy "Users can update own profile" on public.profiles for update using
 -- Classes
 alter table public.classes enable row level security;
 create policy "Classes are viewable by everyone" on public.classes for select using (true);
+create policy "Authenticated users can insert classes" on public.classes for insert with check (auth.role() = 'authenticated');
+create policy "Authenticated users can update classes" on public.classes for update using (auth.role() = 'authenticated');
+create policy "Authenticated users can delete classes" on public.classes for delete using (auth.role() = 'authenticated');
 
 -- Class Completions
 alter table public.class_completions enable row level security;
@@ -152,8 +162,13 @@ create policy "Users manage own stats" on public.user_stats for all using (auth.
 
 -- Parasha Requests
 alter table public.parasha_requests enable row level security;
-create policy "Users manage own requests" on public.parasha_requests for all using (auth.uid() = user_id);
+create policy "Users can view own requests" on public.parasha_requests for select using (auth.uid() = user_id);
 create policy "Users can create requests" on public.parasha_requests for insert with check (auth.uid() = user_id);
+create policy "Users can update own requests" on public.parasha_requests for update using (auth.uid() = user_id);
+create policy "Admins can view all requests" on public.parasha_requests for select using (exists (select 1 from public.administrators where user_id = auth.uid()));
+create policy "Admins can update all requests" on public.parasha_requests for update using (exists (select 1 from public.administrators where user_id = auth.uid()));
+create policy "Admins can delete requests" on public.parasha_requests for delete using (exists (select 1 from public.administrators where user_id = auth.uid()));
+
 
 -- Activities
 alter table public.activities enable row level security;
@@ -179,6 +194,10 @@ create policy "Only service role can read forms" on public.forms for select usin
 alter table public.chat_messages enable row level security;
 create policy "Authenticated can read chat" on public.chat_messages for select using (auth.role() = 'authenticated');
 create policy "Authenticated can insert chat" on public.chat_messages for insert with check (auth.role() = 'authenticated');
+
+-- Administrators
+alter table public.administrators enable row level security;
+create policy "Read own admin status" on public.administrators for select using (auth.uid() = user_id);
 
 
 -- TRIGGERS

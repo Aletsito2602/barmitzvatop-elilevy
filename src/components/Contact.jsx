@@ -36,10 +36,10 @@ const Contact = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       const result = await submitContactForm(formData);
-      
+
       if (result.success) {
         toast({
           title: '¡Mensaje enviado!',
@@ -48,7 +48,7 @@ const Contact = () => {
           duration: 5000,
           isClosable: true,
         });
-        
+
         // Reset form
         setFormData({ name: '', email: '', message: '' });
       } else {
@@ -63,7 +63,7 @@ const Contact = () => {
         isClosable: true,
       });
     }
-    
+
     setIsLoading(false);
   };
   return (
@@ -80,7 +80,7 @@ const Contact = () => {
                 <strong>Ubicación:</strong> Punta pacifica, Panama
               </Text>
               <Text>
-                <strong>Email:</strong> elilevy@barmitzvatop.com
+                <strong>Email:</strong> elilevy91@gmail.com
               </Text>
             </VStack>
           </VStack>
@@ -98,8 +98,8 @@ const Contact = () => {
             <Stack spacing={4}>
               <FormControl id="name" isRequired>
                 <FormLabel>Nombre</FormLabel>
-                <Input 
-                  type="text" 
+                <Input
+                  type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
@@ -108,8 +108,8 @@ const Contact = () => {
               </FormControl>
               <FormControl id="email" isRequired>
                 <FormLabel>Email</FormLabel>
-                <Input 
-                  type="email" 
+                <Input
+                  type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
@@ -118,17 +118,17 @@ const Contact = () => {
               </FormControl>
               <FormControl id="message" isRequired>
                 <FormLabel>Mensaje</FormLabel>
-                <Textarea 
-                  rows={4} 
+                <Textarea
+                  rows={4}
                   name="message"
                   value={formData.message}
                   onChange={handleInputChange}
                   placeholder="Escribe tu mensaje aquí..."
                 />
               </FormControl>
-              <Button 
-                type="submit" 
-                colorScheme="blue" 
+              <Button
+                type="submit"
+                colorScheme="blue"
                 size="lg"
                 isLoading={isLoading}
                 loadingText="Enviando..."

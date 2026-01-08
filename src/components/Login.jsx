@@ -28,9 +28,9 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     const result = await login(email, password);
-    
+
     if (result.success) {
       toast({
         title: '¡Bienvenido!',
@@ -43,7 +43,7 @@ const Login = () => {
     } else {
       // Mensajes de error más amigables
       let friendlyMessage = 'Por favor, revisa tus datos e intenta nuevamente.';
-      
+
       if (result.error.includes('user-not-found')) {
         friendlyMessage = 'No encontramos una cuenta con este email. ¿Te gustaría registrarte?';
       } else if (result.error.includes('wrong-password') || result.error.includes('invalid-credential')) {
@@ -53,7 +53,7 @@ const Login = () => {
       } else if (result.error.includes('too-many-requests')) {
         friendlyMessage = 'Demasiados intentos. Por favor, espera unos minutos antes de intentar nuevamente.';
       }
-      
+
       toast({
         title: 'No pudimos acceder a tu cuenta',
         description: friendlyMessage,
@@ -62,13 +62,13 @@ const Login = () => {
         isClosable: true,
       });
     }
-    
+
     setIsLoading(false);
   };
 
   return (
-    <Box 
-      minH="100vh" 
+    <Box
+      minH="100vh"
       bgGradient="linear(135deg, #667eea 0%, #764ba2 100%)"
       position="relative"
       display="flex"
@@ -87,10 +87,10 @@ const Login = () => {
         bgImage="radial-gradient(circle at 25px 25px, white 2px, transparent 0), radial-gradient(circle at 75px 75px, white 2px, transparent 0)"
         bgSize="100px 100px"
       />
-      
-      <Box 
-        position="relative" 
-        zIndex={1} 
+
+      <Box
+        position="relative"
+        zIndex={1}
         w="100%"
         maxW={{ base: "90%", sm: "400px", md: "500px", lg: "600px", xl: "700px" }}
         mx="auto"
@@ -177,22 +177,7 @@ const Login = () => {
               </Stack>
             </Stack>
 
-            <Divider my={6} borderColor="gray.300" />
 
-            <VStack spacing={4}>
-              <Text fontSize="sm" color="gray.600">
-                ¿No tienes una cuenta?
-              </Text>
-              <Link
-                color="#38BDF8"
-                fontWeight="medium"
-                onClick={() => navigate('/register')}
-                _hover={{ textDecoration: 'underline', color: '#0ea5e9', cursor: 'pointer' }}
-                transition="color 0.2s"
-              >
-                Regístrate aquí
-              </Link>
-            </VStack>
           </Box>
         </VStack>
       </Box>
