@@ -6,39 +6,25 @@ import {
   HStack,
   Avatar,
   Card,
-  CardBody,
   Badge,
-  Button,
-  Divider,
-  SimpleGrid,
   Icon,
   Spinner,
-  Alert,
-  AlertIcon,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
-  useDisclosure,
-  FormControl,
-  FormLabel,
-  Input,
   Textarea,
   useToast,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
   Flex,
-  Spacer,
   IconButton,
+  Tooltip,
+  Container,
 } from '@chakra-ui/react';
-import { FaUsers, FaComments, FaPlus, FaPaperPlane, FaGlobeAmericas, FaGraduationCap, FaBullhorn } from 'react-icons/fa';
-import { useState, useEffect } from 'react';
+import {
+  LuUsers,
+  LuMessageCircle,
+  LuSend,
+  LuGraduationCap,
+  LuCheck,
+  LuSmile
+} from 'react-icons/lu';
+import { useState, useEffect, useRef } from 'react';
 import { useUser } from '../hooks/useUser';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -53,49 +39,93 @@ import {
 } from '../services/forumService';
 
 const ForumMessage = ({ message, currentUser }) => {
-  const isOwnMessage = message.userId === currentUser?.uid;
+  const isOwnMessage = message.userId === currentUser?.id || message.userId === currentUser?.uid;
 
   return (
     <Box
-      alignSelf={isOwnMessage ? 'flex-end' : 'flex-start'}
-      maxW="70%"
-      mb={3}
+      w="100%"
+      display="flex"
+      justifyContent={isOwnMessage ? 'flex-end' : 'flex-start'}
+      mb={4}
+      px={2}
     >
-      <Card
-        bg={isOwnMessage ? '#3B82F6' : 'white'}
-        color={isOwnMessage ? 'white' : 'gray.800'}
-        size="sm"
-      >
-        <CardBody p={3}>
-          <VStack align="start" spacing={1}>
-            <HStack spacing={2} w="100%">
-              <Avatar size="xs" name={message.userName} />
-              <Text fontSize="xs" fontWeight="bold" opacity={0.8}>
-                {message.userName}
-              </Text>
-              <Spacer />
-              <Text fontSize="xs" opacity={0.6}>
-                {message.timestamp?.toDate ?
-                  formatDistanceToNow(message.timestamp.toDate(), { addSuffix: true, locale: es }) :
-                  'Ahora'
-                }
-              </Text>
-            </HStack>
-            <Text fontSize="sm">{message.content}</Text>
-          </VStack>
-        </CardBody>
-      </Card>
+      {!isOwnMessage && (
+        <Avatar
+          size="sm"
+          name={message.userName}
+          src={message.userAvatar}
+          mr={3}
+          mt={1}
+          boxShadow="sm"
+        />
+      )}
+
+      <Box maxW={{ base: "85%", md: "70%" }}>
+        {!isOwnMessage && (
+          <Text fontSize="xs" color="gray.500" ml={1} mb={1} fontWeight="medium">
+            {message.userName}
+          </Text>
+        )}
+
+        <Box
+          bg={isOwnMessage ? 'blue.600' : 'white'}
+          color={isOwnMessage ? 'white' : 'gray.800'}
+          px={5}
+          py={3}
+          borderRadius="2xl"
+          borderTopRightRadius={isOwnMessage ? 'sm' : '2xl'}
+          borderTopLeftRadius={!isOwnMessage ? 'sm' : '2xl'}
+          boxShadow="sm"
+          position="relative"
+          _hover={{ boxShadow: 'md' }}
+          transition="all 0.2s"
+        >
+          <Text fontSize="md" lineHeight="1.6">
+            {message.content}
+          </Text>
+        </Box>
+
+        <HStack justify={isOwnMessage ? 'flex-end' : 'flex-start'} spacing={1} mt={1} ml={1}>
+          <Text fontSize="xs" color="gray.400">
+            {message.timestamp?.toDate ?
+              formatDistanceToNow(message.timestamp.toDate(), { addSuffix: true, locale: es }) :
+              'Ahora'
+            }
+          </Text>
+          {isOwnMessage && <Icon as={LuCheck} color="blue.500" w={3} h={3} opacity={0.8} />}
+        </HStack>
+      </Box>
+
+      {isOwnMessage && (
+        <Avatar
+          size="sm"
+          name={currentUser?.name || 'Yo'}
+          src={currentUser?.profileImage}
+          ml={3}
+          mt={1}
+          boxShadow="sm"
+        />
+      )}
     </Box>
   );
 };
 
-const ForumChat = ({ category, title, icon, description }) => {
+const ForumChat = ({ category, title, icon }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [useLocalStorage, setUseLocalStorage] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const { userProfile } = useUser();
   const toast = useToast();
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   useEffect(() => {
     let cleanupFunction = null;
@@ -103,60 +133,28 @@ const ForumChat = ({ category, title, icon, description }) => {
 
     const initializeForum = async () => {
       try {
-        // Verificar conexión (Supabase)
         const connectionTest = await checkDatabaseConnection();
 
         if (!isMounted) return;
 
         if (connectionTest.connected) {
-          // Usar Supabase
           cleanupFunction = getForumMessages(category, (messagesData, error) => {
             if (!isMounted) return;
-
             if (error) {
-              console.warn('Service error, falling back to localStorage:', error);
-              setUseLocalStorage(true);
-              const localMessages = getLocalForumMessages(category);
-              setMessages(localMessages);
-
-              if (isMounted) {
-                toast({
-                  title: "Modo sin conexión",
-                  description: "Los mensajes se guardarán localmente",
-                  status: "warning",
-                  duration: 3000,
-                });
-              }
+              console.warn('Service error:', error);
             } else {
-              setUseLocalStorage(false);
               setMessages(messagesData);
             }
             setLoading(false);
           });
         } else {
-          // Usar localStorage como fallback
-          setUseLocalStorage(true);
           const localMessages = getLocalForumMessages(category);
           setMessages(localMessages);
           setLoading(false);
-
-          if (isMounted) {
-            toast({
-              title: "Modo sin conexión",
-              description: "Los mensajes se guardarán localmente",
-              status: "info",
-              duration: 4000,
-            });
-          }
         }
       } catch (error) {
         console.error('Error initializing forum:', error);
-        if (isMounted) {
-          setUseLocalStorage(true);
-          const localMessages = getLocalForumMessages(category);
-          setMessages(localMessages);
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
@@ -172,44 +170,34 @@ const ForumChat = ({ category, title, icon, description }) => {
         }
       }
     };
-  }, [category, toast]);
+  }, [category]);
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
 
+    setIsSending(true);
     try {
       const result = await sendForumMessage(
         category,
         newMessage,
-        userProfile?.id || 'anonymous',
+        userProfile?.id || userProfile?.uid || 'anonymous',
         userProfile?.name || 'Usuario Anónimo'
       );
 
       if (result.success) {
         setNewMessage('');
-
-        // Si estamos usando localStorage, actualizar la lista manualmente
-        if (useLocalStorage || result.isLocal) {
-          const localMessages = getLocalForumMessages(category);
-          setMessages(localMessages);
-        }
-
-        toast({
-          title: result.isLocal ? "Mensaje guardado localmente" : "Mensaje enviado",
-          status: "success",
-          duration: 2000,
-        });
       } else {
         throw new Error(result.error);
       }
     } catch (error) {
-      console.error('Error sending message:', error);
       toast({
-        title: "Error al enviar mensaje",
-        description: error.message || "Por favor intenta nuevamente",
+        title: "Error al enviar",
+        description: "No se pudo enviar el mensaje",
         status: "error",
         duration: 3000,
       });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -221,82 +209,148 @@ const ForumChat = ({ category, title, icon, description }) => {
   };
 
   return (
-    <Card h="600px" display="flex" flexDirection="column">
-      <CardBody p={0} display="flex" flexDirection="column" h="100%">
-        {/* Header */}
-        <Box p={4} borderBottom="1px solid" borderColor="gray.200">
-          <HStack spacing={3}>
-            <Icon as={icon} color="#3B82F6" boxSize={6} />
+    <Card
+      h="100%"
+      display="flex"
+      flexDirection="column"
+      bg="white"
+      borderRadius={{ base: "0", md: "2xl" }}
+      boxShadow={{ base: "none", md: "2xl" }}
+      overflow="hidden"
+      border="none"
+    >
+      {/* Header */}
+      <Box
+        p={4}
+        bg="white"
+        borderBottom="1px solid"
+        borderColor="gray.100"
+        boxShadow="sm"
+        zIndex="10"
+      >
+        <Flex justify="space-between" align="center">
+          <HStack spacing={4}>
+            <Box
+              p={2.5}
+              bg="blue.50"
+              borderRadius="xl"
+              color="blue.600"
+            >
+              <Icon as={icon} boxSize={5} />
+            </Box>
             <VStack align="start" spacing={0}>
-              <HStack>
-                <Heading size="md">{title}</Heading>
-                {useLocalStorage && (
-                  <Badge colorScheme="orange" size="sm">
-                    Sin conexión
-                  </Badge>
-                )}
+              <Heading size="sm" color="gray.800">{title}</Heading>
+              <HStack spacing={1.5}>
+                <Box w={2} h={2} borderRadius="full" bg="green.400" />
+                <Text fontSize="xs" color="gray.500" fontWeight="medium">En línea</Text>
               </HStack>
-              <Text fontSize="sm" color="gray.600">{description}</Text>
             </VStack>
           </HStack>
-        </Box>
+        </Flex>
+      </Box>
 
-        {/* Messages Area */}
-        <Box
-          flex={1}
-          p={4}
-          overflowY="auto"
-          display="flex"
-          flexDirection="column"
-          minH={0}
-        >
-          {loading ? (
-            <Flex justify="center" align="center" h="100%">
-              <Spinner size="lg" color="blue.500" />
-            </Flex>
-          ) : messages.length === 0 ? (
-            <Flex justify="center" align="center" h="100%" direction="column">
-              <Icon as={FaComments} boxSize={12} color="gray.300" mb={4} />
-              <Text color="gray.500" textAlign="center">
-                ¡Sé el primero en escribir en este foro!
-              </Text>
-            </Flex>
-          ) : (
-            <VStack spacing={0} align="stretch">
-              {messages.map((message) => (
-                <ForumMessage
-                  key={message.id}
-                  message={message}
-                  currentUser={userProfile}
-                />
-              ))}
-            </VStack>
-          )}
-        </Box>
+      {/* Messages Area */}
+      <Box
+        flex={1}
+        bg="gray.50"
+        p={{ base: 2, md: 6 }}
+        overflowY="auto"
+        display="flex"
+        flexDirection="column"
+        css={{
+          '&::-webkit-scrollbar': { width: '6px' },
+          '&::-webkit-scrollbar-track': { background: 'transparent' },
+          '&::-webkit-scrollbar-thumb': { background: '#CBD5E0', borderRadius: '24px' },
+        }}
+      >
+        {loading ? (
+          <Flex justify="center" align="center" h="100%">
+            <Spinner size="lg" color="blue.500" thickness="3px" />
+          </Flex>
+        ) : messages.length === 0 ? (
+          <Flex justify="center" align="center" h="100%" direction="column" opacity={0.7}>
+            <Box p={6} bg="white" borderRadius="full" mb={6} boxShadow="lg">
+              <Icon as={LuMessageCircle} boxSize={10} color="blue.400" />
+            </Box>
+            <Text color="gray.600" fontWeight="semibold" fontSize="lg">
+              Comienza la conversación
+            </Text>
+            <Text fontSize="sm" color="gray.400" mt={1}>
+              Este espacio es para ti y tus compañeros
+            </Text>
+          </Flex>
+        ) : (
+          <VStack spacing={2} align="stretch" pb={2}>
+            {messages.map((message) => (
+              <ForumMessage
+                key={message.id}
+                message={message}
+                currentUser={userProfile}
+              />
+            ))}
+            <div ref={messagesEndRef} />
+          </VStack>
+        )}
+      </Box>
 
-        {/* Input Area */}
-        <Box p={4} borderTop="1px solid" borderColor="gray.200">
-          <HStack spacing={2}>
+      {/* Input Area */}
+      <Box p={4} bg="white" borderTop="1px solid" borderColor="gray.100">
+        <HStack spacing={3} align="flex-end">
+          <Tooltip label="Emojis" hasArrow>
+            <IconButton
+              icon={<Icon as={LuSmile} boxSize={5} />}
+              variant="ghost"
+              colorScheme="gray"
+              aria-label="Emojis"
+              rounded="full"
+              color="gray.400"
+              _hover={{ color: "gray.600", bg: "gray.100" }}
+              h="45px" w="45px"
+            />
+          </Tooltip>
+
+          <Box flex={1}>
             <Textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Escribe tu mensaje..."
-              size="sm"
+              placeholder="Escribe un mensaje..."
+              minH="45px"
+              maxH="120px"
               resize="none"
-              rows={2}
-              flex={1}
+              py={3}
+              px={5}
+              bg="gray.50"
+              border="1px solid"
+              borderColor="gray.200"
+              borderRadius="2xl"
+              _focus={{
+                bg: "white",
+                borderColor: "blue.400",
+                boxShadow: "0 0 0 3px rgba(66, 153, 225, 0.15)",
+              }}
+              rows={1}
+              fontSize="md"
             />
-            <IconButton
-              icon={<FaPaperPlane />}
-              colorScheme="blue"
-              onClick={sendMessage}
-              isDisabled={!newMessage.trim()}
-              aria-label="Enviar mensaje"
-            />
-          </HStack>
-        </Box>
-      </CardBody>
+          </Box>
+
+          <IconButton
+            icon={isSending ? <Spinner size="sm" /> : <Icon as={LuSend} boxSize={5} />}
+            colorScheme="blue"
+            onClick={sendMessage}
+            isDisabled={!newMessage.trim() || isSending}
+            aria-label="Enviar mensaje"
+            rounded="xl"
+            bg="blue.500"
+            _hover={{ bg: "blue.600", transform: "translateY(-1px)", boxShadow: "lg" }}
+            _active={{ transform: "translateY(0)" }}
+            size="lg"
+            h="45px"
+            w="45px"
+            transition="all 0.2s"
+          />
+        </HStack>
+      </Box>
     </Card>
   );
 };
@@ -305,270 +359,87 @@ const ComunidadPage = () => {
   const { userProfile, loading } = useUser();
   const [communityStats, setCommunityStats] = useState({
     totalMessages: 0,
-    totalUsers: 0,
-    messagesGeneralCount: 0,
-    messagesStudentsCount: 0,
-    messagesAnnouncementsCount: 0,
-    recentActivity: []
+    totalUsers: 0
   });
-  const [loadingStats, setLoadingStats] = useState(true);
 
-  // Hook para obtener estadísticas de la comunidad
   useEffect(() => {
     const getStats = async () => {
       try {
-        setLoadingStats(true);
-
         const result = await getCommunityStats();
-
         if (result.success) {
           setCommunityStats(result.data);
-        } else {
-          console.warn('Failed to get stats, using blank/cache');
         }
-
-        setLoadingStats(false);
-
       } catch (error) {
-        console.error('Error setting up stats listener:', error);
-        setLoadingStats(false);
+        console.error('Error fetching stats:', error);
       }
     };
-
     getStats();
   }, []);
 
-  if (loading || loadingStats) {
+  if (loading) {
     return (
-      <Box w="100%" maxW="95vw" mx="auto" py={8} px={{ base: 4, md: 6, lg: 8 }}>
-        <VStack spacing={4} align="center" justify="center" minH="400px">
-          <Spinner size="xl" color="blue.500" thickness="4px" />
-          <Text color="gray.600">Cargando comunidad...</Text>
-        </VStack>
-      </Box>
+      <Flex justify="center" align="center" h="100vh">
+        <Spinner size="xl" color="blue.500" />
+      </Flex>
     );
   }
 
   return (
-    <Box w="100%" maxW="95vw" mx="auto" py={8} px={{ base: 4, md: 6, lg: 8 }}>
-      <VStack spacing={8} align="stretch">
+    <Box
+      h={{ base: "calc(100vh - 60px)", md: "auto" }}
+      minH={{ md: "100vh" }}
+      bg="gray.50"
+      py={{ base: 0, md: 6 }}
+    >
+      <Container
+        maxW="container.xl"
+        h="100%"
+        p={{ base: 0, md: 6 }}
+      >
+        <Flex direction="column" h="100%" gap={6}>
 
-        {/* Header */}
-        <Box textAlign="center">
-          <Heading size="xl" color="gray.800" mb={2}>
-            Comunidad BarmitzvaTop
-          </Heading>
-          <Text color="gray.600" fontSize="lg">
-            Conecta con otros estudiantes, comparte experiencias y aprende juntos
-          </Text>
-        </Box>
-
-        {/* Community Stats */}
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6}>
-          <Card>
-            <CardBody>
-              <HStack spacing={4}>
-                <Box p={3} bg="blue.100" borderRadius="lg">
-                  <Icon as={FaComments} color="blue.600" boxSize={6} />
-                </Box>
-                <VStack align="start" spacing={1}>
-                  <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-                    {communityStats.totalMessages}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">Mensajes Totales</Text>
-                </VStack>
-              </HStack>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody>
-              <HStack spacing={4}>
-                <Box p={3} bg="green.100" borderRadius="lg">
-                  <Icon as={FaUsers} color="green.600" boxSize={6} />
-                </Box>
-                <VStack align="start" spacing={1}>
-                  <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-                    {communityStats.totalUsers}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">Usuarios Activos</Text>
-                </VStack>
-              </HStack>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody>
-              <HStack spacing={4}>
-                <Box p={3} bg="purple.100" borderRadius="lg">
-                  <Icon as={FaGlobeAmericas} color="purple.600" boxSize={6} />
-                </Box>
-                <VStack align="start" spacing={1}>
-                  <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-                    {communityStats.messagesGeneralCount}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">Foro General</Text>
-                </VStack>
-              </HStack>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody>
-              <HStack spacing={4}>
-                <Box p={3} bg="orange.100" borderRadius="lg">
-                  <Icon as={FaGraduationCap} color="orange.600" boxSize={6} />
-                </Box>
-                <VStack align="start" spacing={1}>
-                  <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-                    {communityStats.messagesStudentsCount}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">Estudiantes</Text>
-                </VStack>
-              </HStack>
-            </CardBody>
-          </Card>
-        </SimpleGrid>
-
-        {/* Welcome Card */}
-        <Card bg="gradient-to-r from-blue-50 to-indigo-50" borderColor="#3B82F6" borderWidth={2}>
-          <CardBody>
-            <HStack spacing={4}>
-              <Avatar
-                size="lg"
-                name={userProfile?.name || 'Estudiante'}
-                bg="#3B82F6"
-              />
-              <VStack align="start" spacing={1} flex={1}>
-                <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                  ¡Hola, {userProfile?.name || 'Estudiante'}!
-                </Text>
-                <Text color="gray.600">
-                  {communityStats.totalMessages > 0
-                    ? `Únete a ${communityStats.totalMessages} mensajes de ${communityStats.totalUsers} estudiantes activos`
-                    : 'Sé el primero en participar en la comunidad'
-                  }
-                </Text>
-              </VStack>
-              <Icon as={FaUsers} boxSize={8} color="#3B82F6" />
-            </HStack>
-          </CardBody>
-        </Card>
-
-        {/* Recent Activity */}
-        {communityStats.recentActivity.length > 0 && (
-          <Card>
-            <CardBody>
-              <VStack spacing={4} align="stretch">
-                <Heading size="md" color="gray.800">
-                  📈 Actividad Reciente
-                </Heading>
-                <VStack spacing={3} align="stretch">
-                  {communityStats.recentActivity.map((activity, index) => (
-                    <Box key={activity.id || index} p={3} bg="gray.50" borderRadius="md">
-                      <HStack spacing={3}>
-                        <Avatar size="sm" name={activity.userName} />
-                        <VStack align="start" spacing={1} flex={1}>
-                          <HStack spacing={2}>
-                            <Text fontSize="sm" fontWeight="bold">{activity.userName}</Text>
-                            <Badge
-                              size="sm"
-                              colorScheme={
-                                activity.category === 'general' ? 'blue' :
-                                  activity.category === 'estudiantes' ? 'green' : 'orange'
-                              }
-                            >
-                              {activity.category === 'general' ? 'General' :
-                                activity.category === 'estudiantes' ? 'Estudiantes' : 'Anuncios'}
-                            </Badge>
-                          </HStack>
-                          <Text fontSize="sm" color="gray.600" noOfLines={2}>
-                            {activity.content}
-                          </Text>
-                          <Text fontSize="xs" color="gray.400">
-                            {activity.timestamp?.toDate ?
-                              formatDistanceToNow(activity.timestamp.toDate(), { addSuffix: true, locale: es }) :
-                              'Hace poco'
-                            }
-                          </Text>
-                        </VStack>
-                      </HStack>
-                    </Box>
-                  ))}
-                </VStack>
-              </VStack>
-            </CardBody>
-          </Card>
-        )}
-
-        {/* Forums */}
-        <Card>
-          <CardBody>
-            <Flex direction={{ base: 'column', sm: 'row' }} justify="space-between" align={{ base: 'start', sm: 'center' }} mb={4} gap={3}>
-              <Heading size="lg" color="gray.800">
-                💬 Foros de la Comunidad
+          {/* Header Section */}
+          <Flex
+            direction={{ base: "column", md: "row" }}
+            justify="space-between"
+            align={{ base: "start", md: "center" }}
+            gap={4}
+            display={{ base: "none", md: "flex" }}
+            mb={2}
+          >
+            <Box>
+              <Heading size="lg" color="gray.800" fontWeight="800">
+                Comunidad
               </Heading>
-              <HStack spacing={2} bg="gray.100" px={3} py={1} borderRadius="full">
-                <Box w={2} h={2} bg="green.400" borderRadius="full" />
-                <Text fontSize="sm" color="gray.600" fontWeight="medium">
-                  {communityStats.totalUsers} usuarios activos
-                </Text>
+              <Text color="gray.500" fontSize="md" mt={1}>
+                Conecta con tu grupo de estudio
+              </Text>
+            </Box>
+
+            <HStack spacing={4}>
+              <HStack bg="white" px={5} py={2.5} borderRadius="2xl" boxShadow="sm" spacing={3} border="1px solid" borderColor="gray.100">
+                <Box p={2} bg="green.50" borderRadius="xl" color="green.500">
+                  <Icon as={LuUsers} boxSize={5} />
+                </Box>
+                <Box>
+                  <Text fontSize="xs" color="gray.400" fontWeight="bold">EN LÍNEA</Text>
+                  <Text fontWeight="800" color="gray.800" fontSize="lg" lineHeight="1">{communityStats.totalUsers || 0}</Text>
+                </Box>
               </HStack>
-            </Flex>
+            </HStack>
+          </Flex>
 
-            <Tabs variant="soft-rounded" colorScheme="blue" size="sm">
-              <TabList overflowX="auto" py={2} css={{
-                scrollbarWidth: 'none',
-                '::-webkit-scrollbar': { display: 'none' },
-                '-webkit-overflow-scrolling': 'touch'
-              }}>
-                <Tab minW="fit-content" mr={2} _selected={{ color: 'white', bg: 'blue.500' }}>
-                  <Icon as={FaGlobeAmericas} mr={2} />
-                  General ({communityStats.messagesGeneralCount})
-                </Tab>
-                <Tab minW="fit-content" mr={2} _selected={{ color: 'white', bg: 'blue.500' }}>
-                  <Icon as={FaGraduationCap} mr={2} />
-                  Estudiantes ({communityStats.messagesStudentsCount})
-                </Tab>
-                <Tab minW="fit-content" _selected={{ color: 'white', bg: 'blue.500' }}>
-                  <Icon as={FaBullhorn} mr={2} />
-                  Anuncios ({communityStats.messagesAnnouncementsCount})
-                </Tab>
-              </TabList>
+          {/* Main Chat Area */}
+          <Box flex={1} h="100%">
+            <ForumChat
+              category="estudiantes"
+              title="Estudiantes BarmitzvaTop"
+              icon={LuGraduationCap}
+            />
+          </Box>
 
-              <TabPanels>
-                <TabPanel p={0} pt={6}>
-                  <ForumChat
-                    category="general"
-                    title="Foro General"
-                    icon={FaGlobeAmericas}
-                    description="Conversaciones generales sobre la preparación del Barmitzva"
-                  />
-                </TabPanel>
-
-                <TabPanel p={0} pt={6}>
-                  <ForumChat
-                    category="estudiantes"
-                    title="Foro de Estudiantes"
-                    icon={FaGraduationCap}
-                    description="Espacio para que los estudiantes compartan experiencias y se apoyen mutuamente"
-                  />
-                </TabPanel>
-
-                <TabPanel p={0} pt={6}>
-                  <ForumChat
-                    category="anuncios"
-                    title="Anuncios"
-                    icon={FaBullhorn}
-                    description="Noticias importantes y actualizaciones del curso"
-                  />
-                </TabPanel>
-              </TabPanels>
-            </Tabs>
-          </CardBody>
-        </Card>
-
-      </VStack>
+        </Flex>
+      </Container>
     </Box>
   );
 };

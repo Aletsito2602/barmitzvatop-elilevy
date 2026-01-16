@@ -118,6 +118,22 @@ create table public.forms (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- PURCHASES (Stripe payment records)
+create table public.purchases (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete set null,
+  stripe_session_id text unique,
+  stripe_subscription_id text,
+  stripe_customer_id text,
+  plan_name text not null default 'Alef (א)',
+  amount_cents integer not null default 35000,
+  currency text default 'usd',
+  status text default 'pending', -- pending, completed, cancelled, refunded
+  email text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
 -- CHAT MESSAGES (For chatService)
 create table public.chat_messages (
   id uuid default uuid_generate_v4() primary key,
@@ -198,6 +214,11 @@ create policy "Authenticated can insert chat" on public.chat_messages for insert
 -- Administrators
 alter table public.administrators enable row level security;
 create policy "Read own admin status" on public.administrators for select using (auth.uid() = user_id);
+
+-- Purchases
+alter table public.purchases enable row level security;
+create policy "Users can view own purchases" on public.purchases for select using (auth.uid() = user_id);
+create policy "Service role can manage purchases" on public.purchases for all using (auth.role() = 'service_role');
 
 
 -- TRIGGERS

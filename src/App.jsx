@@ -16,6 +16,10 @@ import Login from './components/Login'
 import Register from './components/Register'
 import Dashboard from './components/Dashboard'
 import Checkout from './components/Checkout'
+import CheckoutSuccess from './components/CheckoutSuccess'
+import CheckoutCancel from './components/CheckoutCancel'
+import ForgotPassword from './components/ForgotPassword'
+import ResetPassword from './components/ResetPassword'
 
 // Componente Home con todo el contenido de la landing
 const Home = () => (
@@ -45,17 +49,22 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/checkout" element={<Checkout />} />
+          <Route path="/checkout/success" element={<CheckoutSuccess />} />
+          <Route path="/checkout/cancel" element={<CheckoutCancel />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/comunidad" element={<Dashboard />} />
           <Route path="/dashboard/clases" element={<Dashboard />} />
           <Route path="/dashboard/herramientas" element={<Dashboard />} />
           <Route path="/dashboard/crm" element={<Dashboard />} />
           <Route path="/dashboard/perfil" element={<Dashboard />} />
+          <Route path="/dashboard/parasha" element={<Dashboard />} />
         </Routes>
       </Box>
     </ChakraProvider>
   )
 }
 
-export default App 
+export default App

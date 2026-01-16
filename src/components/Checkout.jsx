@@ -9,12 +9,12 @@ import {
   Text,
   Button,
   Input,
+  InputGroup,
+  InputRightElement,
   FormControl,
   FormLabel,
   Select,
-  Textarea,
   Divider,
-  Badge,
   Icon,
   SimpleGrid,
   Card,
@@ -23,37 +23,35 @@ import {
   AlertIcon,
   AlertTitle,
   AlertDescription,
-  useToast
+  useToast,
+  Spinner,
+  FormErrorMessage,
+  IconButton
 } from '@chakra-ui/react';
-import { FaLock, FaCreditCard, FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaArrowLeft, FaEye, FaEyeSlash, FaCheckCircle } from 'react-icons/fa';
+import { FaLock, FaCreditCard, FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaArrowLeft, FaCheckCircle, FaShieldAlt, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { supabase } from '../supabase/client';
 
 const Checkout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
-  
-  // Intentar obtener plan desde state o localStorage
+
+  // Get plan from state or localStorage
   let selectedPlan = location.state?.plan;
-  
-  console.log('Location state plan:', location.state?.plan);
-  console.log('Current selectedPlan:', selectedPlan);
-  
+
   if (!selectedPlan) {
     try {
       const storedPlan = localStorage.getItem('selectedPlan');
-      console.log('Stored plan in localStorage:', storedPlan);
       if (storedPlan) {
         selectedPlan = JSON.parse(storedPlan);
-        console.log('Parsed stored plan:', selectedPlan);
       }
     } catch (error) {
       console.error('Error reading from localStorage:', error);
     }
   }
-  
-  // Si aún no hay plan, crear uno por defecto para Alef
+
+  // Default plan if none found
   if (!selectedPlan) {
-    console.log('No plan found, creating default Alef plan');
     selectedPlan = {
       name: 'Alef (א)',
       desc: 'Ideal para principiantes que buscan aprender los rezos básicos de manera autodidacta y comenzar su preparación para el Barmitzva.',
@@ -66,16 +64,12 @@ const Checkout = () => {
         { text: 'Berajot principales: Talit, Tefilín, Sheejeyanu' },
         { text: 'Rezo H\' melej (cantado)' },
         { text: 'Rezo Shema (con taamim)' },
-        { text: 'Parashá (según tu fecha de nacimiento, te ayudaré a saber cuál es tu Parashá y la asignaré para ti en la plataforma)' },
+        { text: 'Parashá personalizada según tu fecha' },
         { text: 'Video: Puesta del Tefilín' },
-        { text: 'Kidush de Shabat (viernes a la noche)' }
+        { text: 'Kidush de Shabat' }
       ]
     };
-    // Guardar el plan por defecto
-    localStorage.setItem('selectedPlan', JSON.stringify(selectedPlan));
   }
-  
-  console.log('Final selectedPlan:', selectedPlan);
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -84,103 +78,125 @@ const Checkout = () => {
     phone: '',
     country: '',
     password: '',
-    confirmPassword: '',
-    comments: ''
+    confirmPassword: ''
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showAlreadyPaid, setShowAlreadyPaid] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
+    // Clear error when user types
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
-  const handleSubmit = (e) => {
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'El nombre es requerido';
+    }
+
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'El apellido es requerido';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'El email es requerido';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'El email no es válido';
+    }
+
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'El teléfono es requerido';
+    }
+
+    if (!formData.country) {
+      newErrors.country = 'El país es requerido';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'La contraseña es requerida';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
+    }
+
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Confirma tu contraseña';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Las contraseñas no coinciden';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validar que las contraseñas coincidan
-    if (formData.password !== formData.confirmPassword) {
+
+    if (!validateForm()) {
       toast({
-        title: "Error",
-        description: "Las contraseñas no coinciden",
-        status: "error",
+        title: "Formulario incompleto",
+        description: "Por favor completa todos los campos requeridos",
+        status: "warning",
         duration: 3000,
         isClosable: true,
       });
       return;
     }
 
-    // Validar que la contraseña tenga al menos 6 caracteres
-    if (formData.password.length < 6) {
-      toast({
-        title: "Error",
-        description: "La contraseña debe tener al menos 6 caracteres",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
+    setIsLoading(true);
+
+    try {
+      // Encode password in base64 for secure transmission
+      const encodedPassword = btoa(formData.password);
+
+      // Call Supabase Edge Function to create Stripe Checkout Session
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          country: formData.country,
+          planName: selectedPlan.name,
+          userPassword: encodedPassword // Send encoded password
+        }
       });
-      return;
-    }
-    
-    // Guardar datos del usuario en localStorage para registro posterior
-    localStorage.setItem('pendingUserData', JSON.stringify({
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      phone: formData.phone,
-      country: formData.country,
-      password: formData.password,
-      plan: selectedPlan.name
-    }));
-    
-    // Limpiar localStorage del plan
-    localStorage.removeItem('selectedPlan');
-    
-    // Redirigir a Stripe para el plan Alef
-    console.log('Selected plan name:', selectedPlan.name);
-    if (selectedPlan.name === 'Alef (א)' || selectedPlan.name.includes('Alef')) {
-      window.open('https://buy.stripe.com/4gM7sM3p5epA8Z0aSH8IU03', '_blank');
-      
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data?.url) {
+        // Clear localStorage before redirecting
+        localStorage.removeItem('selectedPlan');
+
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      } else {
+        throw new Error('No se recibió URL de pago');
+      }
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
       toast({
-        title: "Redirigiendo a Stripe",
-        description: "Se abrió una nueva ventana para completar el pago. Cuando termines, regresa aquí y presiona 'Ya Pagué'.",
-        status: "info",
+        title: "Error al procesar",
+        description: error.message || "Hubo un problema al crear la sesión de pago. Por favor intenta nuevamente.",
+        status: "error",
         duration: 5000,
         isClosable: true,
       });
-      
-      // Mostrar botón "Ya Pagué" inmediatamente
-      setShowAlreadyPaid(true);
-    } else {
-      toast({
-        title: "Plan no disponible",
-        description: "Este plan estará disponible próximamente",
-        status: "info",
-        duration: 3000,
-        isClosable: true,
-      });
+      setIsLoading(false);
     }
   };
-
-  const handleAlreadyPaid = () => {
-    toast({
-      title: "¡Excelente!",
-      description: "Redirigiendo al login para acceder a tu cuenta",
-      status: "success",
-      duration: 3000,
-      isClosable: true,
-    });
-    
-    setTimeout(() => {
-      navigate('/login');
-    }, 1000);
-  };
-
-  // Eliminamos el check de plan no seleccionado ya que ahora siempre creamos un plan por defecto
 
   return (
     <Box minH="100vh" bg="gray.50" py={8}>
@@ -204,7 +220,7 @@ const Checkout = () => {
         </VStack>
 
         <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8}>
-          {/* Formulario de Checkout */}
+          {/* Checkout Form */}
           <Card>
             <CardBody>
               <form onSubmit={handleSubmit}>
@@ -215,27 +231,31 @@ const Checkout = () => {
                   </Heading>
 
                   <HStack spacing={4}>
-                    <FormControl isRequired>
+                    <FormControl isRequired isInvalid={errors.firstName}>
                       <FormLabel>Nombre</FormLabel>
                       <Input
                         name="firstName"
                         value={formData.firstName}
                         onChange={handleInputChange}
                         placeholder="Tu nombre"
+                        disabled={isLoading}
                       />
+                      <FormErrorMessage>{errors.firstName}</FormErrorMessage>
                     </FormControl>
-                    <FormControl isRequired>
+                    <FormControl isRequired isInvalid={errors.lastName}>
                       <FormLabel>Apellido</FormLabel>
                       <Input
                         name="lastName"
                         value={formData.lastName}
                         onChange={handleInputChange}
                         placeholder="Tu apellido"
+                        disabled={isLoading}
                       />
+                      <FormErrorMessage>{errors.lastName}</FormErrorMessage>
                     </FormControl>
                   </HStack>
 
-                  <FormControl isRequired>
+                  <FormControl isRequired isInvalid={errors.email}>
                     <FormLabel>
                       <Icon as={FaEnvelope} mr={2} />
                       Email
@@ -246,11 +266,16 @@ const Checkout = () => {
                       value={formData.email}
                       onChange={handleInputChange}
                       placeholder="tu@email.com"
+                      disabled={isLoading}
                     />
+                    <FormErrorMessage>{errors.email}</FormErrorMessage>
+                    <Text fontSize="xs" color="gray.500" mt={1}>
+                      Usarás este email para iniciar sesión
+                    </Text>
                   </FormControl>
 
                   <HStack spacing={4}>
-                    <FormControl isRequired>
+                    <FormControl isRequired isInvalid={errors.phone}>
                       <FormLabel>
                         <Icon as={FaPhone} mr={2} />
                         Teléfono
@@ -260,9 +285,11 @@ const Checkout = () => {
                         value={formData.phone}
                         onChange={handleInputChange}
                         placeholder="+1 234 567 8900"
+                        disabled={isLoading}
                       />
+                      <FormErrorMessage>{errors.phone}</FormErrorMessage>
                     </FormControl>
-                    <FormControl isRequired>
+                    <FormControl isRequired isInvalid={errors.country}>
                       <FormLabel>
                         <Icon as={FaMapMarkerAlt} mr={2} />
                         País
@@ -272,6 +299,7 @@ const Checkout = () => {
                         value={formData.country}
                         onChange={handleInputChange}
                         placeholder="Selecciona país"
+                        disabled={isLoading}
                       >
                         <option value="Argentina">Argentina</option>
                         <option value="México">México</option>
@@ -284,109 +312,97 @@ const Checkout = () => {
                         <option value="Estados Unidos">Estados Unidos</option>
                         <option value="España">España</option>
                         <option value="Panamá">Panamá</option>
+                        <option value="Israel">Israel</option>
                         <option value="Otro">Otro</option>
                       </Select>
+                      <FormErrorMessage>{errors.country}</FormErrorMessage>
                     </FormControl>
                   </HStack>
 
                   <Divider />
 
+                  {/* Password Section */}
                   <Heading size="md" color="gray.800">
                     <Icon as={FaLock} mr={2} />
                     Crear tu Cuenta
                   </Heading>
 
-                  <FormControl isRequired>
+                  <FormControl isRequired isInvalid={errors.password}>
                     <FormLabel>Contraseña</FormLabel>
-                    <HStack>
+                    <InputGroup>
                       <Input
                         name="password"
                         type={showPassword ? "text" : "password"}
                         value={formData.password}
                         onChange={handleInputChange}
                         placeholder="Mínimo 6 caracteres"
+                        disabled={isLoading}
                       />
-                      <Button
-                        variant="ghost"
-                        onClick={() => setShowPassword(!showPassword)}
-                        p={2}
-                      >
-                        <Icon as={showPassword ? FaEyeSlash : FaEye} />
-                      </Button>
-                    </HStack>
+                      <InputRightElement>
+                        <IconButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowPassword(!showPassword)}
+                          icon={showPassword ? <FaEyeSlash /> : <FaEye />}
+                          aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        />
+                      </InputRightElement>
+                    </InputGroup>
+                    <FormErrorMessage>{errors.password}</FormErrorMessage>
                   </FormControl>
 
-                  <FormControl isRequired>
+                  <FormControl isRequired isInvalid={errors.confirmPassword}>
                     <FormLabel>Confirmar Contraseña</FormLabel>
-                    <HStack>
+                    <InputGroup>
                       <Input
                         name="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
                         value={formData.confirmPassword}
                         onChange={handleInputChange}
                         placeholder="Repite tu contraseña"
+                        disabled={isLoading}
                       />
-                      <Button
-                        variant="ghost"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        p={2}
-                      >
-                        <Icon as={showConfirmPassword ? FaEyeSlash : FaEye} />
-                      </Button>
-                    </HStack>
+                      <InputRightElement>
+                        <IconButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          icon={showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                          aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        />
+                      </InputRightElement>
+                    </InputGroup>
+                    <FormErrorMessage>{errors.confirmPassword}</FormErrorMessage>
                   </FormControl>
 
                   <Divider />
 
+                  {/* Security Notice */}
+                  <Alert status="info" borderRadius="lg">
+                    <AlertIcon as={FaShieldAlt} />
+                    <Box fontSize="sm">
+                      <AlertTitle>Pago seguro con Stripe</AlertTitle>
+                      <AlertDescription>
+                        Serás redirigido a Stripe para completar el pago.
+                        Tu cuenta se creará automáticamente después del pago.
+                      </AlertDescription>
+                    </Box>
+                  </Alert>
 
-                  <FormControl>
-                    <FormLabel>Comentarios adicionales (opcional)</FormLabel>
-                    <Textarea
-                      name="comments"
-                      value={formData.comments}
-                      onChange={handleInputChange}
-                      placeholder="¿Algo específico que quieras comentar sobre tu preparación?"
-                      rows={3}
-                    />
-                  </FormControl>
-
-                  {!showAlreadyPaid ? (
-                    <Button
-                      type="submit"
-                      bg={selectedPlan.color}
-                      color="white"
-                      size="lg"
-                      fontWeight="bold"
-                      _hover={{ opacity: 0.8 }}
-                      leftIcon={<FaCreditCard />}
-                    >
-                      Proceder al Pago - ${selectedPlan.price}
-                    </Button>
-                  ) : (
-                    <VStack spacing={3}>
-                      <Alert status="success" borderRadius="lg">
-                        <AlertIcon />
-                        <Box>
-                          <AlertTitle>¡Pago en proceso!</AlertTitle>
-                          <AlertDescription>
-                            ¿Ya completaste tu pago en Stripe?
-                          </AlertDescription>
-                        </Box>
-                      </Alert>
-                      <Button
-                        bg="green.500"
-                        color="white"
-                        size="lg"
-                        fontWeight="bold"
-                        _hover={{ bg: "green.600" }}
-                        leftIcon={<FaCheckCircle />}
-                        onClick={handleAlreadyPaid}
-                        w="100%"
-                      >
-                        ✅ Ya Pagué - Acceder a mi Cuenta
-                      </Button>
-                    </VStack>
-                  )}
+                  <Button
+                    type="submit"
+                    bg={selectedPlan.color}
+                    color="white"
+                    size="lg"
+                    fontWeight="bold"
+                    _hover={{ opacity: 0.9, transform: 'translateY(-2px)' }}
+                    _active={{ transform: 'translateY(0)' }}
+                    leftIcon={isLoading ? <Spinner size="sm" /> : <FaCreditCard />}
+                    isDisabled={isLoading}
+                    transition="all 0.2s"
+                  >
+                    {isLoading ? 'Procesando...' : `Pagar $${selectedPlan.price}/año`}
+                  </Button>
 
                   <Text fontSize="sm" color="gray.500" textAlign="center">
                     🔒 Tu información está protegida con encriptación SSL
@@ -396,7 +412,7 @@ const Checkout = () => {
             </CardBody>
           </Card>
 
-          {/* Resumen del Plan */}
+          {/* Plan Summary */}
           <Card>
             <CardBody>
               <VStack spacing={6} align="stretch">
@@ -427,45 +443,11 @@ const Checkout = () => {
                   <VStack align="start" spacing={2}>
                     {selectedPlan.features.map((feature, idx) => (
                       <HStack key={idx} spacing={3}>
-                        <Icon as={feature.icon} color={selectedPlan.color} />
+                        <Icon as={FaCheckCircle} color={selectedPlan.color} />
                         <Text fontSize="sm" color="gray.700">{feature.text}</Text>
                       </HStack>
                     ))}
                   </VStack>
-                </Box>
-
-                {selectedPlan.detailedInfo && (
-                  <Box>
-                    <Text fontWeight="bold" mb={3} color="gray.800">
-                      📋 Detalles del curso:
-                    </Text>
-                    <VStack align="start" spacing={2} fontSize="sm" color="gray.600">
-                      <Text>⏱️ Duración: {selectedPlan.detailedInfo.duration}</Text>
-                      <Text>📚 Contenido: {selectedPlan.detailedInfo.totalHours}</Text>
-                      <Text>🎯 {selectedPlan.detailedInfo.bestFor}</Text>
-                      <Text>📞 {selectedPlan.detailedInfo.support}</Text>
-                      <Text>🏆 {selectedPlan.detailedInfo.certificate}</Text>
-                    </VStack>
-                  </Box>
-                )}
-
-                <Alert status="info" borderRadius="lg">
-                  <AlertIcon />
-                  <Box fontSize="sm">
-                    <AlertTitle>¡Acceso inmediato!</AlertTitle>
-                    <AlertDescription>
-                      Una vez completado el pago, recibirás acceso instantáneo a la plataforma.
-                    </AlertDescription>
-                  </Box>
-                </Alert>
-
-                <Box bg="green.50" p={4} borderRadius="lg" border="1px solid" borderColor="green.200">
-                  <Text fontWeight="bold" color="green.700" mb={2}>
-                    🎉 Garantía de satisfacción
-                  </Text>
-                  <Text fontSize="sm" color="green.600">
-                    Si no estás completamente satisfecho, tienes 30 días para solicitar un reembolso completo.
-                  </Text>
                 </Box>
               </VStack>
             </CardBody>
@@ -476,4 +458,4 @@ const Checkout = () => {
   );
 };
 
-export default Checkout; 
+export default Checkout;

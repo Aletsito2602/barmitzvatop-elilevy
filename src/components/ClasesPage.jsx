@@ -30,11 +30,11 @@ import {
   ModalCloseButton,
   useToast,
 } from '@chakra-ui/react';
-import { 
-  FaPlay, 
-  FaClock, 
-  FaGraduationCap, 
-  FaVideo, 
+import {
+  FaPlay,
+  FaClock,
+  FaGraduationCap,
+  FaVideo,
   FaBook,
   FaCheckCircle,
   FaLock,
@@ -65,12 +65,13 @@ const ClasesPage = () => {
     setVideoWatched(!clase.youtubeLink); // If no video, mark as watched
     setShowWatchedButton(false);
     onOpen();
-    
+
     // Update last watched class when opening modal
-    if (userProfile?.uid) {
-      await updateLastWatchedClass(userProfile.uid, clase.classNumber);
+    const userId = userProfile?.id || userProfile?.uid;
+    if (userId) {
+      await updateLastWatchedClass(userId, clase.classNumber);
     }
-    
+
     // Show "Ya vi este video" button after 30 seconds only if there's a video
     if (clase.youtubeLink) {
       setTimeout(() => {
@@ -132,18 +133,47 @@ const ClasesPage = () => {
   };
 
   const handleMarkAsCompleted = async () => {
-    if (!selectedClass || !userProfile?.uid) return;
-    
+    console.log('🎯 handleMarkAsCompleted called');
+    console.log('Selected class:', selectedClass);
+    console.log('User profile:', userProfile);
+
+    // Use userProfile.id instead of userProfile.uid
+    const userId = userProfile?.id || userProfile?.uid;
+
+    if (!selectedClass || !userId) {
+      console.error('❌ Missing data:', {
+        hasSelectedClass: !!selectedClass,
+        userId,
+        userProfile
+      });
+      toast({
+        title: 'Error',
+        description: 'No se pudo identificar al usuario o la clase',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
     setIsMarkingComplete(true);
-    
+
     try {
+      console.log('📤 Marking class as completed:', {
+        userId,
+        classId: selectedClass.id,
+        classNumber: selectedClass.classNumber,
+        duration: selectedClass.duration
+      });
+
       const result = await markClassAsCompleted(
-        userProfile.uid, 
-        selectedClass.id, 
-        selectedClass.classNumber, 
+        userId,
+        selectedClass.id,
+        selectedClass.classNumber,
         selectedClass.duration
       );
-      
+
+      console.log('📥 Mark complete result:', result);
+
       if (result.success) {
         toast({
           title: 'Clase completada',
@@ -155,6 +185,7 @@ const ClasesPage = () => {
         // The useUser hook should automatically refresh the data
         window.location.reload(); // Force refresh to update progress
       } else {
+        console.error('❌ Failed to mark complete:', result.error);
         toast({
           title: 'Error',
           description: result.error || 'No se pudo marcar la clase como completada',
@@ -163,6 +194,7 @@ const ClasesPage = () => {
         });
       }
     } catch (error) {
+      console.error('💥 Exception marking complete:', error);
       toast({
         title: 'Error',
         description: 'Ocurrió un error inesperado',
@@ -175,16 +207,17 @@ const ClasesPage = () => {
   };
 
   const handleUnmarkAsCompleted = async () => {
-    if (!selectedClass || !userProfile?.uid) return;
-    
+    const userId = userProfile?.id || userProfile?.uid;
+    if (!selectedClass || !userId) return;
+
     setIsMarkingComplete(true);
-    
+
     try {
       const result = await unmarkClassAsCompleted(
-        userProfile.uid, 
+        userId,
         selectedClass.classNumber
       );
-      
+
       if (result.success) {
         toast({
           title: 'Clase desmarcada',
@@ -253,7 +286,7 @@ const ClasesPage = () => {
   return (
     <Box w="100%" maxW="95vw" mx="auto" py={8} px={{ base: 4, md: 6, lg: 8 }}>
       <VStack spacing={8} align="stretch">
-        
+
         {/* Header */}
         <Box>
           <Heading size="xl" color="gray.800" mb={2}>
@@ -292,9 +325,9 @@ const ClasesPage = () => {
                   {Math.round(((userProgress?.completedClasses?.length || 0) / classes.length) * 100)}% Completado
                 </Badge>
               </HStack>
-              <Progress 
-                value={((userProgress?.completedClasses?.length || 0) / classes.length) * 100} 
-                colorScheme="blue" 
+              <Progress
+                value={((userProgress?.completedClasses?.length || 0) / classes.length) * 100}
+                colorScheme="blue"
                 bg="gray.200"
                 size="lg"
                 borderRadius="full"
@@ -324,13 +357,13 @@ const ClasesPage = () => {
               const videoType = clase.videoType || getVideoType(clase.youtubeLink);
               const thumbnail = getVideoThumbnail(clase.youtubeLink, videoType);
               const CategoryIcon = getCategoryIcon(clase.category);
-              
+
               return (
-                <Card 
-                  key={clase.id} 
-                  variant="outline" 
-                  _hover={{ 
-                    transform: 'translateY(-4px)', 
+                <Card
+                  key={clase.id}
+                  variant="outline"
+                  _hover={{
+                    transform: 'translateY(-4px)',
                     boxShadow: 'xl',
                     cursor: 'pointer'
                   }}
@@ -344,7 +377,7 @@ const ClasesPage = () => {
                   <CardBody p={0}>
                     {/* Video Thumbnail */}
                     <Box position="relative">
-                      <AspectRatio ratio={16/9}>
+                      <AspectRatio ratio={16 / 9}>
                         <Box
                           bgImage={thumbnail ? `url(${thumbnail})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}
                           bgSize="cover"
@@ -361,7 +394,7 @@ const ClasesPage = () => {
                           )}
                         </Box>
                       </AspectRatio>
-                      
+
                       {/* Status Badge */}
                       <Badge
                         position="absolute"
@@ -369,8 +402,8 @@ const ClasesPage = () => {
                         right={3}
                         colorScheme={
                           status === 'completed' ? 'green' :
-                          status === 'current' ? 'blue' :
-                          status === 'locked' ? 'gray' : 'yellow'
+                            status === 'current' ? 'blue' :
+                              status === 'locked' ? 'gray' : 'yellow'
                         }
                         borderRadius="full"
                         px={3}
@@ -404,8 +437,8 @@ const ClasesPage = () => {
                             <Text>{clase.duration}min</Text>
                           </HStack>
                         </HStack>
-                        <Badge 
-                          size="sm" 
+                        <Badge
+                          size="sm"
                           colorScheme={getDifficultyColor(clase.difficulty)}
                         >
                           {translateDifficulty(clase.difficulty)}
@@ -443,10 +476,10 @@ const ClasesPage = () => {
             </HStack>
           </ModalHeader>
           <ModalCloseButton />
-          
+
           <ModalBody overflowY="auto">
             <VStack spacing={6} align="stretch">
-              
+
               {/* Video Player */}
               {selectedClass?.youtubeLink && (
                 <Box position="relative">
@@ -464,7 +497,7 @@ const ClasesPage = () => {
                       setShowWatchedButton(true);
                     }}
                   />
-                  
+
                   {/* "Ya vi este video" button */}
                   {showWatchedButton && !isClassCompleted(selectedClass?.classNumber) && (
                     <Box

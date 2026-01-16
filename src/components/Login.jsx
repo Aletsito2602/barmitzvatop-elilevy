@@ -1,7 +1,6 @@
 import {
   Box,
   Button,
-  Container,
   FormControl,
   FormLabel,
   Heading,
@@ -10,17 +9,22 @@ import {
   Text,
   VStack,
   Link,
-  Divider,
+  Icon,
+  useToast,
+  InputGroup,
+  InputRightElement,
+  IconButton,
 } from '@chakra-ui/react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useToast } from '@chakra-ui/react';
+import { LuLogIn, LuEye, LuEyeOff, LuMail, LuLock } from 'react-icons/lu';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
   const toast = useToast();
@@ -44,21 +48,21 @@ const Login = () => {
       // Mensajes de error más amigables
       let friendlyMessage = 'Por favor, revisa tus datos e intenta nuevamente.';
 
-      if (result.error.includes('user-not-found')) {
-        friendlyMessage = 'No encontramos una cuenta con este email. ¿Te gustaría registrarte?';
-      } else if (result.error.includes('wrong-password') || result.error.includes('invalid-credential')) {
-        friendlyMessage = 'La contraseña no es correcta. ¿Olvidaste tu contraseña?';
+      if (result.error.includes('user-not-found') || result.error.includes('User not found')) {
+        friendlyMessage = 'No encontramos una cuenta con este email.';
+      } else if (result.error.includes('wrong-password') || result.error.includes('invalid-credential') || result.error.includes('Invalid login')) {
+        friendlyMessage = 'La contraseña no es correcta.';
       } else if (result.error.includes('invalid-email')) {
         friendlyMessage = 'Por favor, ingresa un email válido.';
       } else if (result.error.includes('too-many-requests')) {
-        friendlyMessage = 'Demasiados intentos. Por favor, espera unos minutos antes de intentar nuevamente.';
+        friendlyMessage = 'Demasiados intentos. Espera unos minutos.';
       }
 
       toast({
-        title: 'No pudimos acceder a tu cuenta',
+        title: 'No pudimos acceder',
         description: friendlyMessage,
         status: 'error',
-        duration: 6000,
+        duration: 5000,
         isClosable: true,
       });
     }
@@ -74,7 +78,7 @@ const Login = () => {
       display="flex"
       alignItems="center"
       justifyContent="center"
-      p={{ base: 4, md: 8, lg: 12 }}
+      p={{ base: 4, md: 8 }}
     >
       {/* Patrón de fondo decorativo */}
       <Box
@@ -84,79 +88,119 @@ const Login = () => {
         right={0}
         bottom={0}
         opacity={0.1}
-        bgImage="radial-gradient(circle at 25px 25px, white 2px, transparent 0), radial-gradient(circle at 75px 75px, white 2px, transparent 0)"
-        bgSize="100px 100px"
+        bgImage="radial-gradient(circle at 25px 25px, white 2px, transparent 0)"
+        bgSize="50px 50px"
       />
 
       <Box
         position="relative"
         zIndex={1}
         w="100%"
-        maxW={{ base: "90%", sm: "400px", md: "500px", lg: "600px", xl: "700px" }}
+        maxW="450px"
         mx="auto"
       >
-        <VStack spacing={{ base: 6, md: 8 }}>
-          <VStack spacing={{ base: 4, md: 6 }} textAlign="center">
-            <Heading fontSize={{ base: "3xl", md: "4xl", lg: "5xl" }} color="white" textShadow="0 2px 4px rgba(0,0,0,0.3)">
+        <VStack spacing={6}>
+          {/* Header */}
+          <VStack spacing={3} textAlign="center">
+            <Box p={4} bg="whiteAlpha.200" borderRadius="full">
+              <Icon as={LuLogIn} boxSize={10} color="white" />
+            </Box>
+            <Heading fontSize={{ base: "2xl", md: "3xl" }} color="white" textShadow="0 2px 4px rgba(0,0,0,0.2)">
               Inicia Sesión
             </Heading>
-            <Text fontSize={{ base: "md", md: "lg", lg: "xl" }} color="whiteAlpha.900">
+            <Text fontSize="md" color="whiteAlpha.800">
               Accede a tu plataforma de aprendizaje
             </Text>
           </VStack>
 
+          {/* Form Card */}
           <Box
-            bg="rgba(255, 255, 255, 0.95)"
-            backdropFilter="blur(10px)"
-            p={{ base: 8, md: 10, lg: 12 }}
-            borderRadius="xl"
-            boxShadow="0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+            bg="white"
+            p={{ base: 6, md: 8 }}
+            borderRadius="2xl"
+            boxShadow="2xl"
             w="100%"
-            border="1px solid rgba(255, 255, 255, 0.2)"
           >
-            <Stack spacing={{ base: 6, md: 8, lg: 10 }} as="form" onSubmit={handleLogin}>
+            <Stack spacing={6} as="form" onSubmit={handleLogin}>
               <FormControl id="email">
-                <FormLabel color="gray.700" fontWeight="medium">Email</FormLabel>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@email.com"
-                  size={{ base: "md", md: "lg" }}
-                  bg="white"
-                  borderColor="gray.200"
-                  _hover={{ borderColor: "#38BDF8" }}
-                  _focus={{ borderColor: "#38BDF8", boxShadow: "0 0 0 1px #38BDF8" }}
-                />
+                <FormLabel color="gray.700" fontSize="sm" fontWeight="medium">
+                  Correo Electrónico
+                </FormLabel>
+                <InputGroup>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="tu@email.com"
+                    size="lg"
+                    borderRadius="xl"
+                    bg="gray.50"
+                    border="1px solid"
+                    borderColor="gray.200"
+                    _hover={{ borderColor: "#667eea" }}
+                    _focus={{
+                      borderColor: "#667eea",
+                      boxShadow: "0 0 0 1px #667eea",
+                      bg: "white"
+                    }}
+                    pl={4}
+                  />
+                </InputGroup>
               </FormControl>
 
               <FormControl id="password">
-                <FormLabel color="gray.700" fontWeight="medium">Contraseña</FormLabel>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  size={{ base: "md", md: "lg" }}
-                  bg="white"
-                  borderColor="gray.200"
-                  _hover={{ borderColor: "#38BDF8" }}
-                  _focus={{ borderColor: "#38BDF8", boxShadow: "0 0 0 1px #38BDF8" }}
-                />
+                <FormLabel color="gray.700" fontSize="sm" fontWeight="medium">
+                  Contraseña
+                </FormLabel>
+                <InputGroup>
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    size="lg"
+                    borderRadius="xl"
+                    bg="gray.50"
+                    border="1px solid"
+                    borderColor="gray.200"
+                    _hover={{ borderColor: "#667eea" }}
+                    _focus={{
+                      borderColor: "#667eea",
+                      boxShadow: "0 0 0 1px #667eea",
+                      bg: "white"
+                    }}
+                    pl={4}
+                  />
+                  <InputRightElement h="full">
+                    <IconButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPassword(!showPassword)}
+                      icon={<Icon as={showPassword ? LuEyeOff : LuEye} color="gray.400" />}
+                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                      _hover={{ bg: "gray.100" }}
+                    />
+                  </InputRightElement>
+                </InputGroup>
               </FormControl>
 
-              <Stack spacing={4}>
+              <Stack spacing={4} pt={2}>
                 <Button
                   type="submit"
                   bg="#38BDF8"
                   color="white"
-                  size={{ base: "md", md: "lg" }}
-                  fontSize={{ base: "sm", md: "md" }}
-                  h={{ base: "50px", md: "56px" }}
+                  size="lg"
+                  borderRadius="xl"
+                  h="56px"
+                  fontSize="md"
+                  fontWeight="semibold"
                   _hover={{
                     bg: '#0ea5e9',
                     transform: 'translateY(-2px)',
                     boxShadow: '0 10px 25px rgba(56, 189, 248, 0.3)',
+                  }}
+                  _active={{
+                    transform: 'translateY(0)',
                   }}
                   transition="all 0.2s"
                   isLoading={isLoading}
@@ -166,23 +210,38 @@ const Login = () => {
                 </Button>
 
                 <Link
-                  color="#38BDF8"
+                  as={RouterLink}
+                  to="/forgot-password"
+                  color="#667eea"
                   fontSize="sm"
                   textAlign="center"
-                  _hover={{ textDecoration: 'underline', color: '#0ea5e9' }}
+                  fontWeight="medium"
+                  _hover={{ textDecoration: 'underline', color: '#764ba2' }}
                   transition="color 0.2s"
                 >
                   ¿Olvidaste tu contraseña?
                 </Link>
               </Stack>
             </Stack>
-
-
           </Box>
+
+          {/* Footer Link */}
+          <Text color="whiteAlpha.800" fontSize="sm">
+            ¿No tienes cuenta?{' '}
+            <Link
+              as={RouterLink}
+              to="/checkout"
+              color="white"
+              fontWeight="bold"
+              _hover={{ textDecoration: 'underline' }}
+            >
+              Regístrate aquí
+            </Link>
+          </Text>
         </VStack>
       </Box>
     </Box>
   );
 };
 
-export default Login; 
+export default Login;

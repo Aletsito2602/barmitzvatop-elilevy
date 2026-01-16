@@ -65,12 +65,24 @@ export const getUserProfile = async (uid) => {
 
     if (error) throw error;
 
+    // Extract additional fields stored in preferences
+    const prefs = data.preferences || {};
+
     // Transform snake_case to camelCase for frontend compatibility
     const formattedData = {
       ...data,
       name: data.full_name,
       profileImage: data.avatar_url,
-      personalParasha: data.personal_parasha
+      personalParasha: data.personal_parasha,
+      studyPlan: data.study_plan,
+      // Additional fields from preferences
+      phone: prefs.phone || null,
+      birthDate: prefs.birthDate || null,
+      barmitzvaDate: prefs.barmitzvaDate || null,
+      birthPlace: prefs.birthPlace || null,
+      barmitzvaLocation: prefs.barmitzvaLocation || null,
+      bio: prefs.bio || null,
+      goals: prefs.goals || null,
     };
 
     return { success: true, data: formattedData };
@@ -84,11 +96,39 @@ export const updateUserProfile = async (uid, updates) => {
   try {
     // Map camelCase updates to snake_case db fields
     const dbUpdates = {};
+
+    // Direct column mappings
     if (updates.name) dbUpdates.full_name = updates.name;
+    if (updates.email) dbUpdates.email = updates.email;
     if (updates.profileImage) dbUpdates.avatar_url = updates.profileImage;
     if (updates.personalParasha) dbUpdates.personal_parasha = updates.personalParasha;
-    if (updates.studyPlan) dbUpdates.study_plan = updates.studyPlan;
-    if (updates.preferences) dbUpdates.preferences = updates.preferences;
+    // Note: studyPlan is NOT editable by users, only by admins
+
+    // Store additional profile data in preferences JSONB field
+    const additionalData = {};
+    if (updates.phone !== undefined) additionalData.phone = updates.phone;
+    if (updates.birthDate !== undefined) additionalData.birthDate = updates.birthDate;
+    if (updates.barmitzvaDate !== undefined) additionalData.barmitzvaDate = updates.barmitzvaDate;
+    if (updates.birthPlace !== undefined) additionalData.birthPlace = updates.birthPlace;
+    if (updates.barmitzvaLocation !== undefined) additionalData.barmitzvaLocation = updates.barmitzvaLocation;
+    if (updates.bio !== undefined) additionalData.bio = updates.bio;
+    if (updates.goals !== undefined) additionalData.goals = updates.goals;
+
+    // If we have additional data, merge it with existing preferences
+    if (Object.keys(additionalData).length > 0) {
+      // First fetch existing preferences
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('preferences')
+        .eq('id', uid)
+        .single();
+
+      const existingPrefs = currentProfile?.preferences || {};
+      dbUpdates.preferences = {
+        ...existingPrefs,
+        ...additionalData
+      };
+    }
 
     const { error } = await supabase
       .from('profiles')

@@ -68,11 +68,41 @@ export const useAuth = () => {
     }
   };
 
+  // Envía email de recuperación de contraseña
+  const resetPassword = async (email) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Actualiza la contraseña (después de hacer clic en el link del email)
+  const updatePassword = async (newPassword) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
   return {
     user,
     loading,
     login,
     register,
-    logout
+    logout,
+    resetPassword,
+    updatePassword
   };
 };
