@@ -11,17 +11,13 @@ import {
     Badge,
     Icon,
     Flex,
-    SimpleGrid,
-    Divider,
     Button
 } from '@chakra-ui/react';
 import {
     LuPlay,
     LuCalendar,
     LuBookOpen,
-    LuDownload,
     LuArrowLeft,
-    LuClock,
     LuStar
 } from 'react-icons/lu';
 import { useNavigate } from 'react-router-dom';
@@ -130,65 +126,15 @@ const ParashaPage = () => {
                         {/* Top accent */}
                         <Box position="absolute" top={0} left={0} right={0} h="6px" bgGradient="linear(to-r, blue.500, blue.600)" />
 
-                        <CardBody p={{ base: 6, lg: 10 }}>
-                            <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={12} alignItems="center">
-                                <VStack align="start" spacing={6}>
-                                    <Badge
-                                        colorScheme="blue"
-                                        variant="subtle"
-                                        fontSize="xs"
-                                        px={3}
-                                        py={1.5}
-                                        borderRadius="full"
-                                        display="flex"
-                                        alignItems="center"
-                                        gap={2}
-                                    >
-                                        <Icon as={LuStar} size="12px" />
-                                        MI PARASHÁ PERSONAL
-                                    </Badge>
+                        <CardBody p={{ base: 4, lg: 8 }}>
+                            <VStack spacing={8} align="stretch">
 
-                                    <Box>
-                                        <Heading size="4xl" color="gray.900" mb={3} fontFamily="'Playfair Display', serif" fontWeight="900" letterSpacing="-0.02em">
-                                            {parasha.name}
-                                        </Heading>
-                                        <Heading size="2xl" color="blue.600" fontFamily="'Playfair Display', serif" mb={6} fontWeight="700">
-                                            {parasha.hebrew}
-                                        </Heading>
-
-                                        <HStack spacing={3} color="gray.600" fontSize="lg" py={2} px={4} bg="gray.50" borderRadius="xl" display="inline-flex">
-                                            <Icon as={LuBookOpen} color="blue.500" strokeWidth={2.5} />
-                                            <Text fontWeight="600">Lectura: {parasha.reference}</Text>
-                                        </HStack>
-                                    </Box>
-
-                                    {eventDate && (
-                                        <Box w="100%" mt={2}>
-                                            <Text fontSize="xs" fontWeight="bold" color="gray.400" mb={4} textTransform="uppercase" letterSpacing="widest">
-                                                TIEMPO RESTANTE PARA TU BARMITZVA
-                                            </Text>
-                                            <HStack spacing={3} wrap="wrap">
-                                                <CountdownUnit value={timeLeft.days} label="Días" />
-                                                <CountdownUnit value={timeLeft.hours} label="Horas" />
-                                                <CountdownUnit value={timeLeft.minutes} label="Minutos" />
-                                            </HStack>
-                                            <HStack mt={5} color="gray.500" fontSize="sm" bg="blue.50" py={2} px={3} borderRadius="lg" display="inline-flex">
-                                                <Icon as={LuCalendar} color="blue.500" />
-                                                <Text fontWeight="medium">Fecha del evento: {format(eventDate, "d 'de' MMMM 'de' yyyy", { locale: es })}</Text>
-                                            </HStack>
-                                        </Box>
-                                    )}
-                                </VStack>
-
-                                {/* Video Section */}
+                                {/* Video Section - FULL WIDTH */}
                                 <Box
                                     borderRadius="2xl"
                                     overflow="hidden"
-                                    boxShadow="2xl"
+                                    boxShadow="xl"
                                     bg="gray.900"
-                                    position="relative"
-                                    transform={{ lg: "scale(1.02)" }}
-                                    transition="all 0.3s"
                                 >
                                     {parasha.videoUrl ? (
                                         <UniversalVideoPlayer
@@ -198,71 +144,82 @@ const ParashaPage = () => {
                                         />
                                     ) : (
                                         <AspectRatio ratio={16 / 9}>
-                                            <Flex direction="column" justify="center" align="center" bg="gray.50" color="gray.500">
-                                                <Icon as={LuPlay} boxSize={12} mb={4} opacity={0.2} strokeWidth={1} />
-                                                <Text fontWeight="semibold" color="gray.600">Video aún no disponible</Text>
+                                            <Flex direction="column" justify="center" align="center" bg="gray.100" color="gray.500">
+                                                <Icon as={LuPlay} boxSize={16} mb={4} opacity={0.3} strokeWidth={1} />
+                                                <Text fontWeight="semibold" color="gray.600" fontSize="lg">Video aún no disponible</Text>
                                                 <Text fontSize="sm">Tu profesor te asignará el video pronto</Text>
                                             </Flex>
                                         </AspectRatio>
                                     )}
                                 </Box>
-                            </SimpleGrid>
+
+                                {/* Info Section - Parasha Name + Countdown */}
+                                <Flex
+                                    direction={{ base: "column", lg: "row" }}
+                                    justify="space-between"
+                                    align={{ base: "stretch", lg: "center" }}
+                                    gap={6}
+                                    pt={4}
+                                >
+                                    {/* Parasha Info */}
+                                    <VStack align="start" spacing={3}>
+                                        <Badge
+                                            colorScheme="blue"
+                                            variant="subtle"
+                                            fontSize="xs"
+                                            px={3}
+                                            py={1.5}
+                                            borderRadius="full"
+                                            display="flex"
+                                            alignItems="center"
+                                            gap={2}
+                                        >
+                                            <Icon as={LuStar} size="12px" />
+                                            MI PARASHÁ PERSONAL
+                                        </Badge>
+                                        <Heading size="2xl" color="gray.900" fontFamily="'Playfair Display', serif" fontWeight="900">
+                                            {parasha.name}
+                                        </Heading>
+                                        <Heading size="xl" color="blue.600" fontFamily="'Playfair Display', serif" fontWeight="700">
+                                            {parasha.hebrew}
+                                        </Heading>
+                                        <HStack spacing={3} color="gray.600" fontSize="md" py={2} px={4} bg="gray.50" borderRadius="xl">
+                                            <Icon as={LuBookOpen} color="blue.500" strokeWidth={2.5} />
+                                            <Text fontWeight="600">{parasha.reference}</Text>
+                                        </HStack>
+                                    </VStack>
+
+                                    {/* Countdown Section */}
+                                    {eventDate && (
+                                        <Box
+                                            bg="gradient"
+                                            bgGradient="linear(to-br, blue.50, blue.100)"
+                                            p={6}
+                                            borderRadius="2xl"
+                                            textAlign="center"
+                                            minW={{ lg: "320px" }}
+                                        >
+                                            <Text fontSize="xs" fontWeight="bold" color="blue.600" mb={3} textTransform="uppercase" letterSpacing="widest">
+                                                ⏰ Tiempo restante
+                                            </Text>
+                                            <HStack spacing={4} justify="center" mb={4}>
+                                                <CountdownUnit value={timeLeft.days} label="Días" />
+                                                <CountdownUnit value={timeLeft.hours} label="Horas" />
+                                                <CountdownUnit value={timeLeft.minutes} label="Min" />
+                                            </HStack>
+                                            <HStack color="blue.600" fontSize="sm" justify="center">
+                                                <Icon as={LuCalendar} />
+                                                <Text fontWeight="medium">
+                                                    {format(eventDate, "d 'de' MMMM 'de' yyyy", { locale: es })}
+                                                </Text>
+                                            </HStack>
+                                        </Box>
+                                    )}
+                                </Flex>
+
+                            </VStack>
                         </CardBody>
                     </Card>
-
-                    {/* Resources / Additional Info Section */}
-                    <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
-                        <Card bg="white" borderRadius="2xl" boxShadow="lg" border="none" overflow="hidden">
-                            <CardBody p={6}>
-                                <VStack align="start" spacing={4}>
-                                    <Box p={3} bg="orange.50" borderRadius="xl" color="orange.500">
-                                        <Icon as={LuBookOpen} boxSize={6} strokeWidth={2} />
-                                    </Box>
-                                    <Box>
-                                        <Heading size="md" color="gray.800" mb={1}>Texto de Estudio</Heading>
-                                        <Text color="gray.500" fontSize="sm">
-                                            Accede al texto completo de tu Parashá en hebreo y fonética.
-                                        </Text>
-                                    </Box>
-                                    <Button variant="outline" colorScheme="orange" size="sm" width="full" borderRadius="xl">Ver texto</Button>
-                                </VStack>
-                            </CardBody>
-                        </Card>
-
-                        <Card bg="white" borderRadius="2xl" boxShadow="lg" border="none" overflow="hidden">
-                            <CardBody p={6}>
-                                <VStack align="start" spacing={4}>
-                                    <Box p={3} bg="green.50" borderRadius="xl" color="green.500">
-                                        <Icon as={LuDownload} boxSize={6} strokeWidth={2} />
-                                    </Box>
-                                    <Box>
-                                        <Heading size="md" color="gray.800" mb={1}>Audio Taamim</Heading>
-                                        <Text color="gray.500" fontSize="sm">
-                                            Descarga los audios para practicar la cantilación (Taamim).
-                                        </Text>
-                                    </Box>
-                                    <Button variant="outline" colorScheme="green" size="sm" width="full" borderRadius="xl">Descargar</Button>
-                                </VStack>
-                            </CardBody>
-                        </Card>
-
-                        <Card bg="white" borderRadius="2xl" boxShadow="lg" border="none" overflow="hidden">
-                            <CardBody p={6}>
-                                <VStack align="start" spacing={4}>
-                                    <Box p={3} bg="purple.50" borderRadius="xl" color="purple.500">
-                                        <Icon as={LuClock} boxSize={6} strokeWidth={2} />
-                                    </Box>
-                                    <Box>
-                                        <Heading size="md" color="gray.800" mb={1}>Práctica Diaria</Heading>
-                                        <Text color="gray.500" fontSize="sm">
-                                            Agenda tus sesiones de práctica recomendadas.
-                                        </Text>
-                                    </Box>
-                                    <Button variant="outline" colorScheme="purple" size="sm" width="full" borderRadius="xl">Ver calendario</Button>
-                                </VStack>
-                            </CardBody>
-                        </Card>
-                    </SimpleGrid>
 
                 </VStack>
             </Container>
