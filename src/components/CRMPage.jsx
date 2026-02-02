@@ -42,13 +42,25 @@ import {
   Tab,
   TabPanel,
   Divider,
+  Avatar,
+  InputGroup,
+  InputLeftElement,
 } from '@chakra-ui/react';
-import { FaUsers, FaTrash, FaDownload, FaEye, FaCalendarAlt, FaClock, FaMapMarkerAlt, FaBuilding, FaUser, FaPlus, FaVideo, FaGraduationCap, FaBookOpen } from 'react-icons/fa';
+import { FaUsers, FaTrash, FaDownload, FaEye, FaCalendarAlt, FaClock, FaMapMarkerAlt, FaBuilding, FaUser, FaPlus, FaVideo, FaGraduationCap, FaBookOpen, FaStar, FaSearch, FaEdit } from 'react-icons/fa';
 import { useState, useEffect } from 'react';
 import { createClass, getAllClasses, deleteClass, initializeSampleClasses } from '../services/classesService';
 import { testDatabaseConnection, initializeDatabaseCollections } from '../services/debugService';
 import { useClasses } from '../hooks/useClasses';
-import { calculateParashaFromDate, assignParashaToRequest, getAllParashaRequests, deleteParashaRequest } from '../services/parashaService';
+import {
+  calculateParashaFromDate,
+  assignParashaToRequest,
+  getAllParashaRequests,
+  deleteParashaRequest,
+  getAllUsersWithParasha,
+  assignParashaToUser,
+  removeParashaFromUser,
+  PARASHAT_CATALOG
+} from '../services/parashaService';
 import { updateUserProfile } from '../services/userService';
 
 const CRMPage = () => {
@@ -57,10 +69,11 @@ const CRMPage = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isDetailOpen, onOpen: onDetailOpen, onClose: onDetailClose } = useDisclosure();
   const { isOpen: isAssignOpen, onOpen: onAssignOpen, onClose: onAssignClose } = useDisclosure();
+  const { isOpen: isUserParashaOpen, onOpen: onUserParashaOpen, onClose: onUserParashaClose } = useDisclosure();
   const [isCreatingClass, setIsCreatingClass] = useState(false);
   const [selectedSolicitud, setSelectedSolicitud] = useState(null);
   const [isAssigningParasha, setIsAssigningParasha] = useState(false);
-  const [parashaForm, setParashaForm] = useState({ name: '', hebrew: '', reference: '', meaning: '' });
+  const [parashaForm, setParashaForm] = useState({ name: '', hebrew: '', reference: '', meaning: '', videoUrl: '', eventDate: '' });
   const [classForm, setClassForm] = useState({
     title: '',
     classNumber: '',
@@ -71,6 +84,16 @@ const CRMPage = () => {
     difficulty: 'basico',
     category: 'alef'
   });
+
+  // Estados para Gestión de Parashot Personales
+  const [allUsers, setAllUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [parashaFilter, setParashaFilter] = useState('all'); // 'all', 'with', 'without'
+  const [selectedCatalogParasha, setSelectedCatalogParasha] = useState('');
+  const [isAssigningUserParasha, setIsAssigningUserParasha] = useState(false);
+
   const toast = useToast();
 
   // Cargar solicitudes desde Supabase
@@ -92,9 +115,158 @@ const CRMPage = () => {
     }
   };
 
+  // Cargar todos los usuarios con sus parashot
+  const loadAllUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const result = await getAllUsersWithParasha();
+      if (result.success) {
+        setAllUsers(result.data);
+      } else {
+        toast({
+          title: "Error cargando usuarios",
+          description: result.error,
+          status: "error",
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadSolicitudes();
+    loadAllUsers();
   }, []);
+
+  // Filtrar usuarios según búsqueda y filtro de parashá
+  const filteredUsers = allUsers.filter(user => {
+    const matchesSearch = userSearchTerm === '' ||
+      user.name?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+      user.email?.toLowerCase().includes(userSearchTerm.toLowerCase());
+
+    const matchesFilter = parashaFilter === 'all' ||
+      (parashaFilter === 'with' && user.hasParasha) ||
+      (parashaFilter === 'without' && !user.hasParasha);
+
+    return matchesSearch && matchesFilter;
+  });
+
+  // Abrir modal para asignar parashá a usuario
+  const abrirModalParashaUsuario = (user) => {
+    setSelectedUser(user);
+    setSelectedCatalogParasha('');
+    if (user.personalParasha) {
+      setParashaForm({
+        name: user.personalParasha.name || '',
+        hebrew: user.personalParasha.hebrew || '',
+        reference: user.personalParasha.reference || '',
+        meaning: user.personalParasha.meaning || '',
+        videoUrl: user.personalParasha.videoUrl || '',
+        eventDate: user.personalParasha.eventDate || ''
+      });
+    } else {
+      setParashaForm({ name: '', hebrew: '', reference: '', meaning: '', videoUrl: '', eventDate: '' });
+    }
+    onUserParashaOpen();
+  };
+
+  // Seleccionar parashá del catálogo
+  const handleSelectCatalogParasha = (index) => {
+    if (index === '') {
+      setSelectedCatalogParasha('');
+      return;
+    }
+    const parasha = PARASHAT_CATALOG[parseInt(index)];
+    setSelectedCatalogParasha(index);
+    setParashaForm({
+      ...parashaForm,
+      name: parasha.name,
+      hebrew: parasha.hebrew,
+      reference: parasha.reference
+    });
+  };
+
+  // Asignar parashá a usuario
+  const asignarParashaAUsuario = async () => {
+    if (!parashaForm.name || !parashaForm.hebrew) {
+      toast({
+        title: "Campos requeridos",
+        description: "Completa al menos el nombre y texto hebreo",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+
+    setIsAssigningUserParasha(true);
+
+    try {
+      const parashaData = {
+        name: parashaForm.name,
+        hebrew: parashaForm.hebrew,
+        reference: parashaForm.reference || '',
+        meaning: parashaForm.meaning || '',
+        videoUrl: parashaForm.videoUrl || '',
+        eventDate: parashaForm.eventDate || ''
+      };
+
+      const result = await assignParashaToUser(selectedUser.id, parashaData);
+
+      if (!result.success) throw new Error(result.error);
+
+      toast({
+        title: "¡Parashá asignada!",
+        description: `Se ha asignado ${parashaData.name} a ${selectedUser.name || selectedUser.email}`,
+        status: "success",
+        duration: 5000,
+      });
+
+      loadAllUsers();
+      onUserParashaClose();
+
+    } catch (error) {
+      console.error('Error assigning parasha to user:', error);
+      toast({
+        title: "Error al asignar",
+        description: error.message || "Error desconocido",
+        status: "error",
+        duration: 5000,
+      });
+    } finally {
+      setIsAssigningUserParasha(false);
+    }
+  };
+
+  // Eliminar parashá de usuario
+  const eliminarParashaDeUsuario = async (userId, userName) => {
+    if (window.confirm(`¿Estás seguro de eliminar la parashá de ${userName}?`)) {
+      try {
+        const result = await removeParashaFromUser(userId);
+        if (result.success) {
+          toast({
+            title: "Parashá eliminada",
+            description: `Se ha eliminado la parashá de ${userName}`,
+            status: "success",
+            duration: 3000,
+          });
+          loadAllUsers();
+        } else {
+          throw new Error(result.error);
+        }
+      } catch (error) {
+        toast({
+          title: "Error al eliminar",
+          description: error.message,
+          status: "error",
+          duration: 3000,
+        });
+      }
+    }
+  };
 
   // Eliminar una solicitud específica
   const eliminarSolicitud = async (id) => {
@@ -270,6 +442,10 @@ const CRMPage = () => {
         <Tabs variant="enclosed" colorScheme="blue">
           <TabList>
             <Tab _hover={{ bg: "blue.50", color: "blue.600" }}>
+              <Icon as={FaStar} mr={2} />
+              Parashot Personales
+            </Tab>
+            <Tab _hover={{ bg: "blue.50", color: "blue.600" }}>
               <Icon as={FaUser} mr={2} />
               Solicitudes Parashá
             </Tab>
@@ -280,6 +456,161 @@ const CRMPage = () => {
           </TabList>
 
           <TabPanels>
+            {/* NUEVA PESTAÑA: Gestión de Parashot Personales */}
+            <TabPanel>
+              <VStack spacing={6} align="stretch">
+                {/* Header y filtros */}
+                <Flex justify="space-between" align="center" flexWrap="wrap" gap={4}>
+                  <Box>
+                    <Heading size="lg" color="gray.800">
+                      Parashot Personales
+                    </Heading>
+                    <Text color="gray.600">
+                      Asigna y gestiona las parashot de cada usuario
+                    </Text>
+                  </Box>
+                  <HStack spacing={3}>
+                    <Badge colorScheme="green" fontSize="md" px={3} py={1}>
+                      {allUsers.filter(u => u.hasParasha).length} con parashá
+                    </Badge>
+                    <Badge colorScheme="orange" fontSize="md" px={3} py={1}>
+                      {allUsers.filter(u => !u.hasParasha).length} sin parashá
+                    </Badge>
+                  </HStack>
+                </Flex>
+
+                {/* Filtros y búsqueda */}
+                <HStack spacing={4} flexWrap="wrap">
+                  <InputGroup maxW="300px">
+                    <InputLeftElement>
+                      <Icon as={FaSearch} color="gray.400" />
+                    </InputLeftElement>
+                    <Input
+                      placeholder="Buscar por nombre o email..."
+                      value={userSearchTerm}
+                      onChange={(e) => setUserSearchTerm(e.target.value)}
+                    />
+                  </InputGroup>
+                  <Select
+                    value={parashaFilter}
+                    onChange={(e) => setParashaFilter(e.target.value)}
+                    maxW="200px"
+                  >
+                    <option value="all">Todos los usuarios</option>
+                    <option value="with">Con parashá</option>
+                    <option value="without">Sin parashá</option>
+                  </Select>
+                </HStack>
+
+                {/* Lista de usuarios */}
+                {usersLoading ? (
+                  <Card>
+                    <CardBody>
+                      <VStack spacing={4} py={12}>
+                        <Text color="gray.500">Cargando usuarios...</Text>
+                      </VStack>
+                    </CardBody>
+                  </Card>
+                ) : filteredUsers.length === 0 ? (
+                  <Card>
+                    <CardBody>
+                      <VStack spacing={4} py={12}>
+                        <Icon as={FaUsers} color="gray.300" boxSize={16} />
+                        <Heading size="md" color="gray.500">No se encontraron usuarios</Heading>
+                        <Text color="gray.400" textAlign="center">
+                          Intenta cambiar los filtros de búsqueda
+                        </Text>
+                      </VStack>
+                    </CardBody>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardHeader>
+                      <Heading size="md">Usuarios ({filteredUsers.length})</Heading>
+                    </CardHeader>
+                    <CardBody>
+                      <TableContainer>
+                        <Table variant="simple" size="sm">
+                          <Thead>
+                            <Tr>
+                              <Th>Usuario</Th>
+                              <Th>Email</Th>
+                              <Th>Parashá Asignada</Th>
+                              <Th>Plan</Th>
+                              <Th>Acciones</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {filteredUsers.map((user) => (
+                              <Tr key={user.id}>
+                                <Td>
+                                  <HStack>
+                                    <Avatar size="sm" name={user.name || user.email} src={user.avatar} />
+                                    <Text fontWeight="medium">{user.name || 'Sin nombre'}</Text>
+                                  </HStack>
+                                </Td>
+                                <Td>
+                                  <Text fontSize="sm" color="gray.600">{user.email}</Text>
+                                </Td>
+                                <Td>
+                                  {user.personalParasha ? (
+                                    <VStack align="start" spacing={0}>
+                                      <HStack>
+                                        <Badge colorScheme="green" fontSize="xs">Asignada</Badge>
+                                        <Text fontWeight="bold" color="blue.600">
+                                          {user.personalParasha.name}
+                                        </Text>
+                                      </HStack>
+                                      <Text fontSize="xs" color="gray.500">
+                                        {user.personalParasha.hebrew}
+                                      </Text>
+                                    </VStack>
+                                  ) : (
+                                    <Badge colorScheme="orange" fontSize="xs">Sin parashá</Badge>
+                                  )}
+                                </Td>
+                                <Td>
+                                  <Badge
+                                    colorScheme={user.studyPlan === 'dalet' ? 'purple' : user.studyPlan === 'guimel' ? 'blue' : user.studyPlan === 'bet' ? 'green' : 'gray'}
+                                    fontSize="xs"
+                                  >
+                                    {user.studyPlan?.toUpperCase() || 'ALEF'}
+                                  </Badge>
+                                </Td>
+                                <Td>
+                                  <HStack spacing={2}>
+                                    <Button
+                                      size="xs"
+                                      colorScheme={user.hasParasha ? "blue" : "green"}
+                                      leftIcon={<Icon as={user.hasParasha ? FaEdit : FaBookOpen} />}
+                                      onClick={() => abrirModalParashaUsuario(user)}
+                                    >
+                                      {user.hasParasha ? 'Editar' : 'Asignar'}
+                                    </Button>
+                                    {user.hasParasha && (
+                                      <Button
+                                        size="xs"
+                                        colorScheme="red"
+                                        variant="ghost"
+                                        onClick={() => eliminarParashaDeUsuario(user.id, user.name || user.email)}
+                                        title="Eliminar parashá"
+                                      >
+                                        <Icon as={FaTrash} />
+                                      </Button>
+                                    )}
+                                  </HStack>
+                                </Td>
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      </TableContainer>
+                    </CardBody>
+                  </Card>
+                )}
+              </VStack>
+            </TabPanel>
+
             {/* Solicitudes Tab */}
             <TabPanel>
               <VStack spacing={6} align="stretch">
@@ -1090,6 +1421,173 @@ const CRMPage = () => {
               Asignar Parashá
             </Button>
             <Button variant="ghost" onClick={onAssignClose}>
+              Cancelar
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Modal para Asignar/Editar Parashá de Usuario */}
+      <Modal isOpen={isUserParashaOpen} onClose={onUserParashaClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            <HStack spacing={3}>
+              <Icon as={FaStar} color="#F59E0B" />
+              <VStack align="start" spacing={0}>
+                <Text>{selectedUser?.hasParasha ? 'Editar' : 'Asignar'} Parashá Personal</Text>
+                <Text fontSize="sm" fontWeight="normal" color="gray.500">
+                  {selectedUser?.name || selectedUser?.email}
+                </Text>
+              </VStack>
+            </HStack>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={5}>
+              {/* Selector de Catálogo */}
+              <FormControl>
+                <FormLabel>
+                  <HStack>
+                    <Icon as={FaBookOpen} color="blue.500" />
+                    <Text>Seleccionar del Catálogo (54 Parashot)</Text>
+                  </HStack>
+                </FormLabel>
+                <Select
+                  placeholder="-- Selecciona una parashá del catálogo --"
+                  value={selectedCatalogParasha}
+                  onChange={(e) => handleSelectCatalogParasha(e.target.value)}
+                >
+                  <optgroup label="📖 Bereshit (Génesis)">
+                    {PARASHAT_CATALOG.filter(p => p.book === 'Bereshit').map((p, idx) => (
+                      <option key={idx} value={PARASHAT_CATALOG.indexOf(p)}>
+                        {p.name} - {p.hebrew}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="📖 Shemot (Éxodo)">
+                    {PARASHAT_CATALOG.filter(p => p.book === 'Shemot').map((p, idx) => (
+                      <option key={idx} value={PARASHAT_CATALOG.indexOf(p)}>
+                        {p.name} - {p.hebrew}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="📖 Vayikrá (Levítico)">
+                    {PARASHAT_CATALOG.filter(p => p.book === 'Vayikrá').map((p, idx) => (
+                      <option key={idx} value={PARASHAT_CATALOG.indexOf(p)}>
+                        {p.name} - {p.hebrew}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="📖 Bamidbar (Números)">
+                    {PARASHAT_CATALOG.filter(p => p.book === 'Bamidbar').map((p, idx) => (
+                      <option key={idx} value={PARASHAT_CATALOG.indexOf(p)}>
+                        {p.name} - {p.hebrew}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="📖 Devarim (Deuteronomio)">
+                    {PARASHAT_CATALOG.filter(p => p.book === 'Devarim').map((p, idx) => (
+                      <option key={idx} value={PARASHAT_CATALOG.indexOf(p)}>
+                        {p.name} - {p.hebrew}
+                      </option>
+                    ))}
+                  </optgroup>
+                </Select>
+              </FormControl>
+
+              <Divider />
+
+              <Text fontSize="sm" color="gray.500" alignSelf="start">
+                O ingresa los datos manualmente:
+              </Text>
+
+              <HStack spacing={4} w="full">
+                <FormControl isRequired flex={1}>
+                  <FormLabel>Nombre de la Parashá</FormLabel>
+                  <Input
+                    value={parashaForm.name}
+                    onChange={(e) => setParashaForm({ ...parashaForm, name: e.target.value })}
+                    placeholder="Ej: Bereshit"
+                  />
+                </FormControl>
+
+                <FormControl isRequired flex={1}>
+                  <FormLabel>Texto en Hebreo</FormLabel>
+                  <Input
+                    value={parashaForm.hebrew}
+                    onChange={(e) => setParashaForm({ ...parashaForm, hebrew: e.target.value })}
+                    placeholder="Ej: בראשית"
+                    dir="rtl"
+                  />
+                </FormControl>
+              </HStack>
+
+              <FormControl>
+                <FormLabel>Referencia Bíblica</FormLabel>
+                <Input
+                  value={parashaForm.reference}
+                  onChange={(e) => setParashaForm({ ...parashaForm, reference: e.target.value })}
+                  placeholder="Ej: Génesis 1:1 - 6:8"
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>Significado / Descripción</FormLabel>
+                <Textarea
+                  value={parashaForm.meaning}
+                  onChange={(e) => setParashaForm({ ...parashaForm, meaning: e.target.value })}
+                  placeholder="Descripción o significado de la parashá..."
+                  rows={2}
+                />
+              </FormControl>
+
+              <Divider />
+
+              <Text fontSize="sm" color="gray.500" alignSelf="start" fontWeight="bold">
+                Contenido Multimedia (opcional):
+              </Text>
+
+              <FormControl>
+                <FormLabel>
+                  <HStack>
+                    <Icon as={FaVideo} color="red.500" />
+                    <Text>URL del Video</Text>
+                  </HStack>
+                </FormLabel>
+                <Input
+                  value={parashaForm.videoUrl}
+                  onChange={(e) => setParashaForm({ ...parashaForm, videoUrl: e.target.value })}
+                  placeholder="https://www.youtube.com/watch?v=... o https://vimeo.com/..."
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>
+                  <HStack>
+                    <Icon as={FaCalendarAlt} color="green.500" />
+                    <Text>Fecha del Bar Mitzvá</Text>
+                  </HStack>
+                </FormLabel>
+                <Input
+                  type="date"
+                  value={parashaForm.eventDate}
+                  onChange={(e) => setParashaForm({ ...parashaForm, eventDate: e.target.value })}
+                />
+              </FormControl>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              colorScheme="green"
+              mr={3}
+              onClick={asignarParashaAUsuario}
+              isLoading={isAssigningUserParasha}
+              leftIcon={<Icon as={FaStar} />}
+            >
+              {selectedUser?.hasParasha ? 'Actualizar Parashá' : 'Asignar Parashá'}
+            </Button>
+            <Button variant="ghost" onClick={onUserParashaClose}>
               Cancelar
             </Button>
           </ModalFooter>

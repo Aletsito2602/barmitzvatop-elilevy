@@ -118,7 +118,7 @@ const ParashaPage = () => {
 
                 <VStack spacing={8} align="stretch">
                     {/* Header Hero Section */}
-                    <Box
+                    <Card
                         bg="white"
                         borderRadius="3xl"
                         boxShadow="2xl"
@@ -208,7 +208,7 @@ const ParashaPage = () => {
                                 </Box>
                             </SimpleGrid>
                         </CardBody>
-                    </Box>
+                    </Card>
 
                     {/* Resources / Additional Info Section */}
                     <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
