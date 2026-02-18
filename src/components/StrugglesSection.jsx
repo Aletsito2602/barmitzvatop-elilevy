@@ -1,9 +1,9 @@
-import { Box, Heading, SimpleGrid, VStack, Text, HStack, Icon } from '@chakra-ui/react';
+import { Box, Heading, SimpleGrid, VStack, Text, HStack, Icon, Button } from '@chakra-ui/react';
 import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { CheckCircleIcon, WarningIcon } from '@chakra-ui/icons';
 
 const struggles = [
-          "No sabes por dónde empezar a prepararte para tu Barmitzva.",
+  "No sabes por dónde empezar a prepararte para tu Barmitzva.",
   "Te cuesta aprender los rezos y las melodías.",
   "Sientes que te falta motivación o acompañamiento.",
   "No tienes acceso a clases personalizadas o materiales claros.",
@@ -11,9 +11,10 @@ const struggles = [
 ];
 
 const needs = [
-  "Guía paso a paso para prepararte con confianza.",
-  "Clases online y materiales exclusivos, disponibles siempre.",
-  "Acompañamiento personalizado en cada etapa.",
+  "Guía paso a paso para prepararte para tu Barmitzva con seguridad y confianza.",
+  "Clases grabadas y materiales exclusivos disponibles siempre.",
+  "Curso de Barmitzva completo online 100% autodidacta.",
+  "Método probado con +17 años de experiencia con clases presenciales y online.",
   "Aprende a tu ritmo, desde cualquier lugar.",
   "Llega seguro y motivado a tu Barmitzva."
 ];
@@ -44,7 +45,7 @@ const StrugglesSection = () => (
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          whileHover={{ 
+          whileHover={{
             scale: 1.02,
             transition: { duration: 0.2 }
           }}
@@ -56,6 +57,7 @@ const StrugglesSection = () => (
             align="start"
             bg="white"
             boxShadow="md"
+            h="100%"
             _hover={{
               boxShadow: "0 15px 30px rgba(186, 230, 253, 0.3)",
               borderColor: "#3B82F6"
@@ -90,7 +92,7 @@ const StrugglesSection = () => (
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          whileHover={{ 
+          whileHover={{
             scale: 1.02,
             transition: { duration: 0.2 }
           }}
@@ -102,6 +104,7 @@ const StrugglesSection = () => (
             align="start"
             bg="#FEF3C7"
             boxShadow="0 4px 24px 0 #FED7AA"
+            h="100%"
             _hover={{
               boxShadow: "0 20px 40px rgba(245, 158, 11, 0.3)",
               borderColor: "#D97706"
@@ -132,8 +135,46 @@ const StrugglesSection = () => (
           </VStack>
         </motion.div>
       </SimpleGrid>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6, delay: 0.6 }}
+      >
+        <Box textAlign="center" mt={12}>
+          <motion.div
+            whileHover={{ scale: 1.03, y: -2 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Button
+              bg="#F59E0B"
+              color="white"
+              fontWeight="bold"
+              px={{ base: 6, md: 8 }}
+              py={{ base: 4, md: 5 }}
+              borderRadius="full"
+              boxShadow="0 6px 20px rgba(245, 158, 11, 0.35)"
+              fontSize="md"
+              _hover={{
+                bg: '#D97706',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 12px 30px rgba(245, 158, 11, 0.45)',
+              }}
+              transition="all 0.3s ease"
+              onClick={() => {
+                document.getElementById('pricing')?.scrollIntoView({
+                  behavior: 'smooth'
+                });
+              }}
+            >
+              Quiero prepararme ahora
+            </Button>
+          </motion.div>
+        </Box>
+      </motion.div>
     </Box>
   </Box>
 );
 
-export default StrugglesSection; 
+export default StrugglesSection;

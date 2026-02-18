@@ -1,5 +1,6 @@
 import { Box, Button, Heading, Text, VStack, HStack, Image } from '@chakra-ui/react'
 import { motion } from 'framer-motion' // eslint-disable-line no-unused-vars
+import { FaArrowRight } from 'react-icons/fa'
 
 const Hero = () => {
   return (
@@ -76,28 +77,28 @@ const Hero = () => {
               whileTap={{ scale: 0.95 }}
             >
               <Button
-                size="lg"
-                bgGradient="linear(to-r, #3B82F6, #1E40AF)"
+                bg="#F37328"
                 color="white"
-                px={10}
-                py={6}
-                fontSize="lg"
+                px={{ base: 6, md: 8 }}
+                py={{ base: 5, md: 6 }}
+                fontSize={{ base: 'md', md: 'lg' }}
                 fontWeight="bold"
-                borderRadius="xl"
-                boxShadow="0 10px 25px rgba(59, 130, 246, 0.3)"
+                borderRadius="full"
+                boxShadow="0 8px 25px rgba(243, 115, 40, 0.4)"
+                rightIcon={<FaArrowRight />}
                 _hover={{
-                  bgGradient: 'linear(to-r, #1E40AF, #1E3A8A)',
-                  transform: 'translateY(-3px)',
-                  boxShadow: '0 15px 35px rgba(59, 130, 246, 0.4)',
+                  bg: '#D95E1A',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 12px 30px rgba(243, 115, 40, 0.5)',
                 }}
                 transition="all 0.3s ease"
                 onClick={() => {
-                  document.getElementById('pricing')?.scrollIntoView({ 
-                    behavior: 'smooth' 
+                  document.getElementById('pricing')?.scrollIntoView({
+                    behavior: 'smooth'
                   });
                 }}
               >
-                Comenzar Ahora
+                Comienza hoy la preparación
               </Button>
             </motion.div>
           </VStack>
