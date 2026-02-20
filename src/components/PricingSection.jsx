@@ -41,6 +41,7 @@ const plans = [
       { icon: FaCalendarAlt, text: 'Parashá (según tu fecha de nacimiento, te ayudaré a saber cuál es tu Parashá y la asignaré para ti en la plataforma)' },
       { icon: FaVideo, text: 'Video: Puesta del Tefilín' },
       { icon: FaPrayingHands, text: 'Kidush de Shabat (viernes a la noche)' },
+      { icon: FaMusic, text: 'Clase de Taamim' },
     ],
     color: '#F59E0B',
     detailedInfo: {

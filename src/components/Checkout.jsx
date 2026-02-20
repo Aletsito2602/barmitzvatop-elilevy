@@ -66,7 +66,8 @@ const Checkout = () => {
         { text: 'Rezo Shema (con taamim)' },
         { text: 'Parashá personalizada según tu fecha' },
         { text: 'Video: Puesta del Tefilín' },
-        { text: 'Kidush de Shabat' }
+        { text: 'Kidush de Shabat' },
+        { text: 'Clase de Taamim' }
       ]
     };
   }

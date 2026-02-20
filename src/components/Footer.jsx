@@ -1,5 +1,5 @@
 import { Box, Container, Stack, Text, IconButton, HStack, VStack, Link, SimpleGrid, Image } from '@chakra-ui/react';
-import { FaInstagram, FaFacebook, FaYoutube, FaTiktok } from 'react-icons/fa';
+import { FaInstagram, FaFacebook, FaYoutube, FaTiktok, FaWhatsapp } from 'react-icons/fa';
 import { MdLocationOn, MdEmail } from 'react-icons/md';
 import { Link as RouterLink } from 'react-router-dom';
 
@@ -20,6 +20,7 @@ const Footer = () => {
               <IconButton as="a" href="https://www.facebook.com/share/1A8n5FBfM3/" target="_blank" rel="noopener noreferrer" icon={<FaFacebook />} aria-label="Facebook" size="lg" variant="ghost" color="black" _hover={{ color: '#38BDF8' }} />
               <IconButton as="a" href="https://youtube.com/@barmitzvatop" target="_blank" rel="noopener noreferrer" icon={<FaYoutube />} aria-label="YouTube" size="lg" variant="ghost" color="black" _hover={{ color: '#38BDF8' }} />
               <IconButton as="a" href="https://www.tiktok.com/@barmitzvatop" target="_blank" rel="noopener noreferrer" icon={<FaTiktok />} aria-label="TikTok" size="lg" variant="ghost" color="black" _hover={{ color: '#38BDF8' }} />
+              <IconButton as="a" href="https://wa.me/50769330841" target="_blank" rel="noopener noreferrer" icon={<FaWhatsapp />} aria-label="WhatsApp" size="lg" variant="ghost" color="black" _hover={{ color: '#25D366' }} />
             </HStack>
           </VStack>
 
@@ -43,6 +44,12 @@ const Footer = () => {
             <HStack>
               <Box as={MdEmail} color="green.500" boxSize={5} />
               <Text color="gray.500">elilevy@barmitzvatop.com</Text>
+            </HStack>
+            <HStack>
+              <Box as={FaWhatsapp} color="green.500" boxSize={5} />
+              <Link href="https://wa.me/50769330841" isExternal color="gray.500" _hover={{ color: 'green.500' }}>
+                +507 6933-0841
+              </Link>
             </HStack>
           </VStack>
         </SimpleGrid>
